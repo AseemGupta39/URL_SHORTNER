@@ -11,6 +11,16 @@ class IDGenerator(ABC):
         """Generate unique numeric ID across workers"""
         pass
 
+    @abstractmethod
+    async def generate_short_code(self) -> str:
+        """
+        Generate unique short code (base62 encoded).
+
+        Convenience method that generates ID and encodes it.
+        Primary method for service layer usage.
+        """
+        pass
+
 
 class SnowflakeIDGenerator(IDGenerator):
     """
