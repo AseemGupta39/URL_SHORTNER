@@ -21,7 +21,8 @@ class URLService:
         self,
         url_repo: URLRepository,
         id_generator: IDGenerator,
-        base_domain: str = "short.ly"
+        base_domain: str = "short.ly",
+        base_url_scheme: str = "https"
     ):
         """
         Initialize URL service.
@@ -30,10 +31,12 @@ class URLService:
             url_repo: Repository for URL data persistence
             id_generator: Generator for unique short codes
             base_domain: Base domain for constructing short URLs
+            base_url_scheme: URL scheme (http or https)
         """
         self.url_repo = url_repo
         self.id_generator = id_generator
         self.base_domain = base_domain
+        self.base_url_scheme = base_url_scheme
 
     async def shorten(self, original_url: HttpUrl) -> ShortenResponse:
         """
@@ -65,7 +68,7 @@ class URLService:
         created_url = await self.url_repo.create(url_data)
 
         # Construct short URL
-        short_url = f"https://{self.base_domain}/{short_code}"
+        short_url = f"{self.base_url_scheme}://{self.base_domain}/{short_code}"
 
         # Return response
         return ShortenResponse(

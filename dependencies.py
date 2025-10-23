@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings
 from fastapi import Depends
 
 from id_generation import IDGenerator, SnowflakeIDGenerator
+from repositories import URLRepository, SQLiteURLRepository
+from services import URLService
 
 
 class Settings(BaseSettings):
@@ -26,6 +28,7 @@ class Settings(BaseSettings):
 
     # Application
     base_domain: str = "short.ly"
+    base_url_scheme: str = "https"  # http or https
 
     class Config:
         env_file = ".env"
@@ -54,16 +57,31 @@ async def get_id_generator() -> IDGenerator:
     )
 
 
-# Placeholder for future URL repository DI
-# async def get_url_repository() -> URLRepository:
-#     """Dependency injection factory for URL repository."""
-#     return SQLiteURLRepository(db_path=settings.database_path)
+async def get_url_repository() -> URLRepository:
+    """
+    Dependency injection factory for URL repository.
+
+    Returns:
+        SQLiteURLRepository configured from settings
+    """
+    repo = SQLiteURLRepository(db_path=settings.database_path)
+    await repo.initialize()
+    return repo
 
 
-# Placeholder for future URL service DI
-# async def get_url_service(
-#     url_repo: URLRepository = Depends(get_url_repository),
-#     id_generator: IDGenerator = Depends(get_id_generator)
-# ) -> URLService:
-#     """Dependency injection factory for URL service."""
-#     return URLService(url_repo, id_generator)
+async def get_url_service(
+    url_repo: URLRepository = Depends(get_url_repository),
+    id_generator: IDGenerator = Depends(get_id_generator)
+) -> URLService:
+    """
+    Dependency injection factory for URL service.
+
+    Returns:
+        URLService with injected dependencies
+    """
+    return URLService(
+        url_repo=url_repo,
+        id_generator=id_generator,
+        base_domain=settings.base_domain,
+        base_url_scheme=settings.base_url_scheme
+    )
