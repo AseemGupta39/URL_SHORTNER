@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     base_domain: str = "short.ly"
     base_url_scheme: str = "https"  # http or https
 
+    # Server Configuration
+    host: str = "0.0.0.0"
+    port: int = 8000
+    reload: bool = True  # Auto-reload for development
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

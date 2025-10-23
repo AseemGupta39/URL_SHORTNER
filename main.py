@@ -9,6 +9,7 @@ from fastapi import FastAPI
 import uvicorn
 
 from app.api.routes import router
+from app.config.settings import settings
 
 
 # Initialize FastAPI application
@@ -28,12 +29,12 @@ if __name__ == "__main__":
     """
     Run the application directly for development.
 
-    For production, use: uvicorn main:app --host 0.0.0.0 --port 8000
+    For production, use: uvicorn main:app --host 0.0.0.0 --port 8000 --no-reload
     """
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8001,
-        reload=True,
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
         log_level="info"
     )
