@@ -3,30 +3,12 @@ Repository implementations for URL storage using SQLAlchemy ORM.
 """
 from abc import ABC, abstractmethod
 from typing import Optional
-from datetime import datetime
 
-from sqlalchemy import Column, String, DateTime, Index, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 
-from schemas import URLData
-
-
-Base = declarative_base()
-
-
-class URLModel(Base):
-    """SQLAlchemy model for URL mappings."""
-
-    __tablename__ = "urls"
-
-    short_code = Column(String(7), primary_key=True)
-    original_url = Column(String, nullable=False)
-    created_at = Column(DateTime, nullable=False)
-
-    __table_args__ = (
-        Index('idx_created_at', 'created_at'),
-    )
+from app.data.models import URLModel, Base
+from app.core.schemas import URLData
 
 
 class URLRepository(ABC):

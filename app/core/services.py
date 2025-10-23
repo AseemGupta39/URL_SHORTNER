@@ -4,10 +4,10 @@ Business logic layer for URL shortening service.
 from datetime import datetime
 from pydantic import HttpUrl
 
-from schemas import URLData, ShortenResponse, RedirectResponse
-from repositories import URLRepository
-from id_generation import IDGenerator
-from exceptions import ShortCodeNotFoundException
+from app.core.schemas import URLData, ShortenResponse, RedirectResponse
+from app.data.repositories import URLRepository
+from app.utils.id_generator import IDGenerator
+from app.core.exceptions import ShortCodeNotFoundException
 
 
 class URLService:

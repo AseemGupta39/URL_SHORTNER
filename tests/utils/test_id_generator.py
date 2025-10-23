@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 import time
-from id_generation import SnowflakeIDGenerator
+from app.utils.id_generator import SnowflakeIDGenerator
 
 
 # Use a recent epoch to avoid timestamp overflow in tests

@@ -7,11 +7,11 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from pydantic import HttpUrl
 
-from services import URLService
-from schemas import URLData, ShortenResponse, RedirectResponse
-from exceptions import ShortCodeNotFoundException
-from repositories import URLRepository
-from id_generation import IDGenerator
+from app.core.services import URLService
+from app.core.schemas import URLData, ShortenResponse, RedirectResponse
+from app.core.exceptions import ShortCodeNotFoundException
+from app.data.repositories import URLRepository
+from app.utils.id_generator import IDGenerator
 
 
 @pytest_asyncio.fixture

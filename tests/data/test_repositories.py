@@ -5,8 +5,8 @@ import pytest
 import pytest_asyncio
 import os
 from datetime import datetime
-from schemas import URLData
-from repositories import SQLiteURLRepository
+from app.core.schemas import URLData
+from app.data.repositories import SQLiteURLRepository
 
 
 @pytest.fixture

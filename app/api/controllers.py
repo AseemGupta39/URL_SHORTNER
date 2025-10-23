@@ -6,8 +6,8 @@ business logic to the service layer.
 """
 from pydantic import HttpUrl
 
-from schemas import ShortenRequest, ShortenResponse, RedirectResponse
-from services import URLService
+from app.core.schemas import ShortenRequest, ShortenResponse, RedirectResponse
+from app.core.services import URLService
 
 
 class ShortenController:
