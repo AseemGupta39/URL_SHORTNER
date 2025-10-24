@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     port: int = 8000
     reload: bool = True  # Auto-reload for development
 
+    # CORS Configuration
+    cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500"  # Comma-separated list of allowed origins
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
