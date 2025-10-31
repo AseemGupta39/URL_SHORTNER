@@ -4,6 +4,10 @@
 // Production: https://your-app.up.railway.app (or your deployed backend URL)
 const API_BASE_URL = 'http://localhost:8000';
 
+// Initialize logger (loaded from logger.js)
+// Set log level: DEBUG (development) or INFO (production)
+// LoggerConfig.setLogLevel('INFO');  // Uncomment for production
+
 // DOM Elements
 const shortenForm = document.getElementById('shortenForm');
 const longUrlInput = document.getElementById('longUrl');
@@ -27,13 +31,16 @@ async function handleSubmit(e) {
     e.preventDefault();
 
     const longUrl = longUrlInput.value.trim();
-    console.log(longUrl);
+    logger.debug('Form submitted', { url: longUrl });
 
     // Validate URL
     if (!isValidUrl(longUrl)) {
+        logger.warning('Invalid URL format provided', { url: longUrl });
         showError('Please enter a valid URL (e.g., https://example.com)');
         return;
     }
+
+    logger.debug('URL validation passed, starting shortening process');
 
     // Reset UI
     hideError();
@@ -43,8 +50,10 @@ async function handleSubmit(e) {
 
     try {
         const shortUrl = await shortenUrl(longUrl);
+        logger.info('URL shortened successfully', { originalUrl: longUrl, shortUrl });
         showResult(longUrl, shortUrl);
     } catch (error) {
+        logger.error('Failed to shorten URL', { error: error.message, url: longUrl });
         showError(error.message);
     } finally {
         hideLoading();
@@ -56,6 +65,8 @@ async function handleSubmit(e) {
  * Call API to shorten URL
  */
 async function shortenUrl(longUrl) {
+    logger.debug('Sending API request to shorten URL', { url: longUrl });
+
     try {
         const response = await fetch(`${API_BASE_URL}/v1/shorten`, {
             method: 'POST',
@@ -65,12 +76,16 @@ async function shortenUrl(longUrl) {
             body: JSON.stringify({ original_url: longUrl })
         });
 
+        logger.debug('Received API response', { status: response.status, ok: response.ok });
+
         if (!response.ok) {
             const errorData = await response.json();
+            logger.error('API returned error response', { status: response.status, detail: errorData.detail });
             throw new Error(errorData.detail || 'Failed to shorten URL');
         }
 
         const data = await response.json();
+        logger.debug('API response parsed successfully', { shortCode: data.short_code });
 
         // Build the short URL
         // The API returns the short_code, we need to construct the full URL
@@ -79,6 +94,7 @@ async function shortenUrl(longUrl) {
         return shortUrl;
     } catch (error) {
         if (error.message.includes('fetch')) {
+            logger.error('Failed to connect to backend server', { baseUrl: API_BASE_URL });
             throw new Error('Unable to connect to server. Please ensure the backend is running.');
         }
         throw error;
@@ -90,9 +106,11 @@ async function shortenUrl(longUrl) {
  */
 async function handleCopy() {
     const shortUrl = shortUrlInput.value;
+    logger.debug('Copy button clicked', { shortUrl });
 
     try {
         await navigator.clipboard.writeText(shortUrl);
+        logger.info('Short URL copied to clipboard', { shortUrl });
 
         // Visual feedback
         copyBtn.innerHTML = `
@@ -114,6 +132,7 @@ async function handleCopy() {
             copyBtn.classList.remove('copy-success');
         }, 2000);
     } catch (error) {
+        logger.error('Failed to copy to clipboard', { error: error.message });
         showError('Failed to copy to clipboard');
     }
 }
@@ -177,14 +196,22 @@ function enableForm() {
  * Check if backend is reachable on page load
  */
 async function checkBackendHealth() {
+    logger.info('Application initialized', { sessionId: logger.getSessionId(), apiBaseUrl: API_BASE_URL });
+    logger.debug('Checking backend health');
+
     try {
         const response = await fetch(`${API_BASE_URL}/docs`, { method: 'HEAD' });
         if (!response.ok) {
-            console.warn('Backend may not be running');
+            logger.warning('Backend health check returned non-OK status', { status: response.status });
+        } else {
+            logger.info('Backend health check successful', { status: response.status });
         }
     } catch (error) {
-        console.warn('Unable to reach backend at', API_BASE_URL);
-        console.log('Make sure your backend is running and update API_BASE_URL in script.js');
+        logger.error('Unable to reach backend server', {
+            baseUrl: API_BASE_URL,
+            error: error.message
+        });
+        logger.info('Tip: Make sure your backend is running and update API_BASE_URL in script.js');
     }
 }
 
