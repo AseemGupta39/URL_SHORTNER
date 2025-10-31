@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     # Logging Configuration
     log_level: str = "DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
+    # Cache Configuration
+    cache_enabled: bool = True  # Enable/disable caching
+    cache_max_size: int = 1000  # Maximum number of entries in cache
+    cache_ttl_seconds: int = 3600  # Time to live (1 hour default)
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
