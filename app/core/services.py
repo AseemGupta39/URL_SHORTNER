@@ -8,6 +8,9 @@ from app.core.schemas import URLData, ShortenResponse, RedirectResponse
 from app.data.repositories import URLRepository
 from app.utils.id_generator import IDGenerator
 from app.core.exceptions import ShortCodeNotFoundException
+from app.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class URLService:
@@ -56,6 +59,7 @@ class URLService:
         """
         # Generate unique short code
         short_code = await self.id_generator.generate_short_code()
+        logger.debug(f"Generated short code: {short_code} for URL: {original_url}")
 
         # Create URL data with current timestamp
         url_data = URLData(
@@ -100,6 +104,7 @@ class URLService:
 
         # Check if found
         if url_data is None:
+            logger.warning(f"Attempted to resolve non-existent short code: {short_code}")
             raise ShortCodeNotFoundException(short_code)
 
         # Return redirect response

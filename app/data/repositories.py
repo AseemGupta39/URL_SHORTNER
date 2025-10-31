@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 
 from app.data.models import URLModel, Base
 from app.core.schemas import URLData
+from app.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class URLRepository(ABC):
@@ -60,6 +63,8 @@ class SQLiteURLRepository(URLRepository):
         - urls table with schema matching URLData
         - Index on created_at for time-based queries
         """
+        logger.info(f"Initializing database connection: {self.db_url}")
+
         self.engine = create_async_engine(
             self.db_url,
             echo=False,
@@ -74,6 +79,8 @@ class SQLiteURLRepository(URLRepository):
             class_=AsyncSession,
             expire_on_commit=False
         )
+
+        logger.info("Database initialized successfully")
 
     async def close(self) -> None:
         """Close database connection."""
@@ -98,6 +105,8 @@ class SQLiteURLRepository(URLRepository):
         if not self.async_session:
             raise RuntimeError("Database not initialized. Call initialize() first.")
 
+        logger.debug(f"Inserting URL mapping: {url_data.short_code} -> {url_data.original_url}")
+
         async with self.async_session() as session:
             url_model = URLModel(
                 short_code=url_data.short_code,
@@ -107,6 +116,7 @@ class SQLiteURLRepository(URLRepository):
             session.add(url_model)
             await session.commit()
 
+        logger.info(f"URL mapping saved to database: {url_data.short_code} -> {url_data.original_url}")
         return url_data
 
     async def get_by_short_code(self, short_code: str) -> Optional[URLData]:
@@ -122,14 +132,18 @@ class SQLiteURLRepository(URLRepository):
         if not self.async_session:
             raise RuntimeError("Database not initialized. Call initialize() first.")
 
+        logger.debug(f"Looking up short code in database: {short_code}")
+
         async with self.async_session() as session:
             stmt = select(URLModel).where(URLModel.short_code == short_code)
             result = await session.execute(stmt)
             url_model = result.scalar_one_or_none()
 
             if url_model is None:
+                logger.debug(f"Short code not found in database: {short_code}")
                 return None
 
+            logger.info(f"URL mapping found: {short_code} -> {url_model.original_url}")
             return URLData(
                 short_code=url_model.short_code,
                 original_url=url_model.original_url,

@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # CORS Configuration
     cors_origins: str = "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500"  # Comma-separated list of allowed origins
 
+    # Logging Configuration
+    log_level: str = "DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

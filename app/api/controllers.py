@@ -8,6 +8,9 @@ from pydantic import HttpUrl
 
 from app.core.schemas import ShortenRequest, ShortenResponse, RedirectResponse
 from app.core.services import URLService
+from app.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class ShortenController:
@@ -50,6 +53,7 @@ class ShortenController:
         # Delegate to service layer
         response = await self.url_service.shorten(request.original_url)
 
+        logger.info(f"URL shortened successfully: {response.short_code} -> {response.short_url}")
         return response
 
 
@@ -95,4 +99,5 @@ class RedirectController:
         # Delegate to service layer
         response = await self.url_service.resolve(short_code)
 
+        logger.info(f"Redirect successful: {short_code} -> {response.original_url}")
         return response
