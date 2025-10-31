@@ -32,9 +32,10 @@ async def get_url_repository() -> URLRepository:
     Dependency injection factory for URL repository.
 
     Returns:
-        SQLiteURLRepository configured from settings
+        SQLiteURLRepository configured from settings.
+        Supports both SQLite (development) and PostgreSQL (production).
     """
-    repo = SQLiteURLRepository(db_path=settings.database_path)
+    repo = SQLiteURLRepository(db_url=settings.database_url)
     await repo.initialize()
     return repo
 

@@ -1,12 +1,16 @@
 // API Configuration
-// IMPORTANT: Update this URL before deploying frontend to production
-// Development: http://localhost:8000
-// Production: https://your-app.up.railway.app (or your deployed backend URL)
-const API_BASE_URL = 'http://localhost:8000';
+// Automatically detects environment:
+// - Development: http://localhost:8000
+// - Production: Uses the deployed backend URL
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000'  // Development
+    : 'https://YOUR_BACKEND_URL.vercel.app';  // TODO: Replace with your actual Vercel backend URL
 
 // Initialize logger (loaded from logger.js)
-// Set log level: DEBUG (development) or INFO (production)
-// LoggerConfig.setLogLevel('INFO');  // Uncomment for production
+// Automatically set log level based on environment
+if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    LoggerConfig.setLogLevel('INFO');  // Production: Less verbose logs
+}
 
 // DOM Elements
 const shortenForm = document.getElementById('shortenForm');

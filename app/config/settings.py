@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    database_path: str = "urls.db"
+    # For SQLite (development): "urls.db"
+    # For PostgreSQL (production): Set DATABASE_URL environment variable
+    database_url: str = "sqlite+aiosqlite:///urls.db"  # Default to SQLite
 
     # ID Generator Configuration
     datacenter_id: int = 0

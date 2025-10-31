@@ -44,14 +44,16 @@ class SQLiteURLRepository(URLRepository):
     - Index on created_at for time-based queries
     """
 
-    def __init__(self, db_path: str = "urls.db"):
+    def __init__(self, db_url: str = "sqlite+aiosqlite:///urls.db"):
         """
-        Initialize repository with database path.
+        Initialize repository with database URL.
 
         Args:
-            db_path: Path to SQLite database file
+            db_url: Database connection URL
+                    - SQLite: "sqlite+aiosqlite:///urls.db"
+                    - PostgreSQL: "postgresql+asyncpg://user:pass@host:port/dbname"
         """
-        self.db_url = f"sqlite+aiosqlite:///{db_path}"
+        self.db_url = db_url
         self.engine = None
         self.async_session = None
 
