@@ -59,16 +59,14 @@ def get_cache() -> Cache | None:
 
 async def get_url_repository() -> URLRepository:
     """
-    Dependency injection factory for URL repository with optional cache support.
+    Dependency injection factory for URL repository.
 
     Returns:
-        SQLiteURLRepository configured from settings with caching (if enabled).
+        SQLiteURLRepository configured from settings.
         Supports both SQLite (development) and PostgreSQL (production).
-        Cache significantly reduces database load for read-heavy workloads.
+        Initialization is lazy - database connection created only when needed.
     """
-    cache = get_cache()  # Get cache instance (or None if disabled)
-    repo = SQLiteURLRepository(db_url=settings.database_url, cache=cache)
-    await repo.initialize()
+    repo = SQLiteURLRepository(db_url=settings.database_url)
     return repo
 
 
@@ -80,11 +78,15 @@ async def get_url_service(
     Dependency injection factory for URL service.
 
     Returns:
-        URLService with injected dependencies
+        URLService with injected dependencies including cache.
+        Cache at service layer provides better separation of concerns
+        and makes migration to Redis easier.
     """
+    cache = get_cache()  # Get cache instance (or None if disabled)
     return URLService(
         url_repo=url_repo,
         id_generator=id_generator,
         base_domain=settings.base_domain,
-        base_url_scheme=settings.base_url_scheme
+        base_url_scheme=settings.base_url_scheme,
+        cache=cache
     )

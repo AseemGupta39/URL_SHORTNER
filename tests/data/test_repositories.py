@@ -22,7 +22,8 @@ def temp_db_path(tmp_path):
 @pytest_asyncio.fixture
 async def repository(temp_db_path):
     """Create a fresh repository instance for each test."""
-    repo = SQLiteURLRepository(db_path=temp_db_path)
+    db_url = f"sqlite+aiosqlite:///{temp_db_path}"
+    repo = SQLiteURLRepository(db_url=db_url)
     await repo.initialize()
     yield repo
     await repo.close()
@@ -34,7 +35,8 @@ class TestSQLiteURLRepositoryInitialization:
     @pytest.mark.asyncio
     async def test_initialize_creates_database(self, temp_db_path):
         """Test that initialize creates the database file and can be used."""
-        repo = SQLiteURLRepository(db_path=temp_db_path)
+        db_url = f"sqlite+aiosqlite:///{temp_db_path}"
+        repo = SQLiteURLRepository(db_url=db_url)
         await repo.initialize()
 
         # Verify database file exists
@@ -339,8 +341,10 @@ class TestSQLiteURLRepositoryIntegration:
     @pytest.mark.asyncio
     async def test_database_persistence(self, temp_db_path):
         """Test that data persists across repository instances."""
+        db_url = f"sqlite+aiosqlite:///{temp_db_path}"
+
         # Create and insert data
-        repo1 = SQLiteURLRepository(db_path=temp_db_path)
+        repo1 = SQLiteURLRepository(db_url=db_url)
         await repo1.initialize()
 
         url_data = URLData(
@@ -352,7 +356,7 @@ class TestSQLiteURLRepositoryIntegration:
         await repo1.close()
 
         # Create new instance and verify data exists
-        repo2 = SQLiteURLRepository(db_path=temp_db_path)
+        repo2 = SQLiteURLRepository(db_url=db_url)
         await repo2.initialize()
 
         result = await repo2.get_by_short_code("persist")
