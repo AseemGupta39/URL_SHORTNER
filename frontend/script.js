@@ -1,10 +1,10 @@
 // API Configuration
 // Automatically detects environment:
 // - Development: http://localhost:8000
-// - Production: Uses the deployed backend URL
+// - Production: https://url-shortner-backend-chi.vercel.app
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'  // Development
-    : 'https://YOUR_BACKEND_URL.vercel.app';  // TODO: Replace with your actual Vercel backend URL
+    ? 'http://localhost:8000'
+    : 'https://url-shortner-backend-chi.vercel.app';
 
 // Initialize logger (loaded from logger.js)
 // Automatically set log level based on environment
