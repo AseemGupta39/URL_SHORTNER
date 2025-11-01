@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from app.data.models import URLModel, Base
 from app.core.schemas import URLData
 from app.utils.logger import get_logger
-from app.utils.cache import Cache
 
 logger = get_logger()
 
@@ -45,18 +44,16 @@ class SQLiteURLRepository(URLRepository):
     - Index on created_at for time-based queries
     """
 
-    def __init__(self, db_url: str = "sqlite+aiosqlite:///urls.db", cache: Optional[Cache] = None):
+    def __init__(self, db_url: str = "sqlite+aiosqlite:///urls.db"):
         """
-        Initialize repository with database URL and optional cache.
+        Initialize repository with database URL.
 
         Args:
             db_url: Database connection URL
                     - SQLite: "sqlite+aiosqlite:///urls.db"
                     - PostgreSQL: "postgresql+asyncpg://user:pass@host:port/dbname"
-            cache: Optional cache implementation for faster lookups
         """
         self.db_url = db_url
-        self.cache = cache  # Cache for read-heavy workloads
         self.engine = None
         self.async_session = None
 
@@ -64,11 +61,17 @@ class SQLiteURLRepository(URLRepository):
         """
         Initialize database engine and create tables if needed.
 
+        Uses lazy initialization - only connects when needed.
+        Safe to call multiple times - will only initialize once.
+
         Creates:
         - urls table with schema matching URLData
         - Index on created_at for time-based queries
         """
-        logger.info(f"Initializing database connection: {self.db_url}")
+        if self.engine is not None:
+            return  # Already initialized
+
+        logger.debug("Initializing database connection")
 
         self.engine = create_async_engine(
             self.db_url,
@@ -96,14 +99,7 @@ class SQLiteURLRepository(URLRepository):
 
     async def create(self, url_data: URLData) -> URLData:
         """
-        Store URL mapping in database and warm the cache.
-
-        **Cache Warming Strategy:**
-        After saving to database, immediately add to cache.
-        This is beneficial because:
-        1. Newly created URLs are often accessed immediately (user testing)
-        2. Avoids cold cache on first access
-        3. No performance penalty (already in memory)
+        Store URL mapping in database.
 
         Args:
             url_data: URLData instance to store
@@ -114,8 +110,7 @@ class SQLiteURLRepository(URLRepository):
         Raises:
             sqlalchemy.exc.IntegrityError: If short_code already exists
         """
-        if not self.async_session:
-            raise RuntimeError("Database not initialized. Call initialize() first.")
+        await self.initialize()
 
         logger.debug(f"Inserting URL mapping: {url_data.short_code} -> {url_data.original_url}")
 
@@ -130,26 +125,11 @@ class SQLiteURLRepository(URLRepository):
 
         logger.info(f"URL mapping saved to database: {url_data.short_code} -> {url_data.original_url}")
 
-        # Cache Warming: Pre-populate cache with newly created URL
-        # This ensures the first access is fast (no cold cache)
-        if self.cache:
-            self.cache.set(url_data.short_code, url_data)
-            logger.debug(f"Cache warmed with new short code: {url_data.short_code}")
-
         return url_data
 
     async def get_by_short_code(self, short_code: str) -> Optional[URLData]:
         """
-        Retrieve URL data by short code with cache support.
-
-        **Caching Strategy (Cache-Aside/Lazy Loading Pattern):**
-        1. Check cache first (fast: ~0.1ms)
-        2. If cache HIT: Return immediately (99% of requests after warming)
-        3. If cache MISS: Query database (slower: ~10-50ms)
-        4. Store database result in cache for next time
-
-        This pattern is ideal for read-heavy workloads like URL shorteners
-        where the same URLs are accessed repeatedly.
+        Retrieve URL data by short code.
 
         Args:
             short_code: The short code to look up
@@ -157,18 +137,8 @@ class SQLiteURLRepository(URLRepository):
         Returns:
             URLData if found, None otherwise
         """
-        if not self.async_session:
-            raise RuntimeError("Database not initialized. Call initialize() first.")
+        await self.initialize()
 
-        # Step 1: Try cache first (if enabled)
-        if self.cache:
-            cached_data = self.cache.get(short_code)
-            if cached_data is not None:
-                logger.debug(f"Cache HIT for short code: {short_code}")
-                return cached_data
-            logger.debug(f"Cache MISS for short code: {short_code}, querying database")
-
-        # Step 2: Cache miss or no cache - query database
         logger.debug(f"Looking up short code in database: {short_code}")
 
         async with self.async_session() as session:
@@ -187,11 +157,6 @@ class SQLiteURLRepository(URLRepository):
                 created_at=url_model.created_at
             )
 
-            # Step 3: Store in cache for future lookups (lazy loading)
-            if self.cache:
-                self.cache.set(short_code, url_data)
-                logger.debug(f"Stored in cache: {short_code}")
-
             return url_data
 
     async def exists(self, short_code: str) -> bool:
@@ -204,8 +169,7 @@ class SQLiteURLRepository(URLRepository):
         Returns:
             True if exists, False otherwise
         """
-        if not self.async_session:
-            raise RuntimeError("Database not initialized. Call initialize() first.")
+        await self.initialize()
 
         async with self.async_session() as session:
             stmt = select(URLModel.short_code).where(URLModel.short_code == short_code)

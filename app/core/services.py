@@ -2,11 +2,13 @@
 Business logic layer for URL shortening service.
 """
 from datetime import datetime
+from typing import Optional
 from pydantic import HttpUrl
 
 from app.core.schemas import URLData, ShortenResponse, RedirectResponse
 from app.data.repositories import URLRepository
 from app.utils.id_generator import IDGenerator
+from app.utils.cache import Cache
 from app.core.exceptions import ShortCodeNotFoundException
 from app.utils.logger import get_logger
 
@@ -17,7 +19,8 @@ class URLService:
     """
     Service layer handling URL shortening and resolution business logic.
 
-    Coordinates between ID generation and data persistence layers.
+    Coordinates between ID generation, caching, and data persistence layers.
+    Cache at service layer allows flexibility (in-memory, Redis, etc.)
     """
 
     def __init__(
@@ -25,7 +28,8 @@ class URLService:
         url_repo: URLRepository,
         id_generator: IDGenerator,
         base_domain: str = "short.ly",
-        base_url_scheme: str = "https"
+        base_url_scheme: str = "https",
+        cache: Optional[Cache] = None
     ):
         """
         Initialize URL service.
@@ -35,11 +39,13 @@ class URLService:
             id_generator: Generator for unique short codes
             base_domain: Base domain for constructing short URLs
             base_url_scheme: URL scheme (http or https)
+            cache: Optional cache (in-memory or Redis) for performance
         """
         self.url_repo = url_repo
         self.id_generator = id_generator
         self.base_domain = base_domain
         self.base_url_scheme = base_url_scheme
+        self.cache = cache
 
     async def shorten(self, original_url: HttpUrl) -> ShortenResponse:
         """
@@ -54,8 +60,9 @@ class URLService:
         Process:
         1. Generate unique short code via ID generator
         2. Create URLData with current timestamp
-        3. Persist to repository
-        4. Return response with constructed short URL
+        3. Warm cache first (for immediate availability)
+        4. Persist to repository
+        5. Return response with constructed short URL
         """
         # Generate unique short code
         short_code = await self.id_generator.generate_short_code()
@@ -67,6 +74,11 @@ class URLService:
             original_url=str(original_url),
             created_at=datetime.now()
         )
+
+        # Warm cache first before DB operation
+        if self.cache:
+            self.cache.set(short_code, url_data)
+            logger.debug(f"Cache warmed with new short code: {short_code}")
 
         # Persist to repository
         created_url = await self.url_repo.create(url_data)
@@ -83,7 +95,7 @@ class URLService:
 
     async def resolve(self, short_code: str) -> RedirectResponse:
         """
-        Resolve a short code to its original URL.
+        Resolve a short code to its original URL with caching support.
 
         Args:
             short_code: The short code to resolve
@@ -93,21 +105,30 @@ class URLService:
 
         Raises:
             ShortCodeNotFoundException: If the short code doesn't exist
-
-        Process:
-        1. Look up short code in repository
-        2. Raise exception if not found
-        3. Return redirect response with original URL
         """
-        # Look up URL data
+        # Check cache first (if enabled)
+        if self.cache:
+            cached_data = self.cache.get(short_code)
+            if cached_data is not None:
+                logger.debug(f"Cache HIT: {short_code}")
+                return RedirectResponse(
+                    original_url=HttpUrl(cached_data.original_url),
+                    status="found"
+                )
+            logger.debug(f"Cache MISS: {short_code}")
+
+        # Query repository on cache miss
         url_data = await self.url_repo.get_by_short_code(short_code)
 
-        # Check if found
         if url_data is None:
-            logger.warning(f"Attempted to resolve non-existent short code: {short_code}")
+            logger.warning(f"Short code not found: {short_code}")
             raise ShortCodeNotFoundException(short_code)
 
-        # Return redirect response
+        # Warm cache for future requests
+        if self.cache:
+            self.cache.set(short_code, url_data)
+            logger.debug(f"Cache updated: {short_code}")
+
         return RedirectResponse(
             original_url=HttpUrl(url_data.original_url),
             status="found"
