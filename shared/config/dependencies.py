@@ -1,0 +1,133 @@
+"""
+Dependency injection factories for FastAPI.
+"""
+from fastapi import Depends
+
+from shared.config.settings import settings
+from shared.utils.id_generator import IDGenerator, SnowflakeIDGenerator
+from shared.data.repositories import URLRepository, SQLiteURLRepository
+from shared.core.services import URLService
+from shared.utils.cache import Cache, LRUCache
+from shared.utils.redis_cache import RedisCache
+from shared.utils.queue import Queue
+from shared.utils.redis_queue import RedisQueue
+from shared.utils.logger import get_logger
+
+logger = get_logger()
+
+
+async def get_id_generator() -> IDGenerator:
+    """
+    Dependency injection factory for ID generator.
+
+    Returns:
+        SnowflakeIDGenerator configured from settings
+    """
+    return SnowflakeIDGenerator(
+        datacenter_id=settings.datacenter_id,
+        worker_id=settings.worker_id,
+        epoch_sec=settings.epoch_sec,
+        timestamp_bits=settings.timestamp_bits,
+        datacenter_bits=settings.datacenter_bits,
+        worker_bits=settings.worker_bits,
+        sequence_bits=settings.sequence_bits
+    )
+
+
+# Global cache instance (singleton)
+_cache_instance: Cache | None = None
+
+
+async def get_cache() -> Cache:
+    """
+    Get the global cache instance.
+
+    Returns:
+        RedisCache if Redis is enabled, otherwise LRUCache
+    """
+    global _cache_instance
+
+    if _cache_instance is None:
+        if settings.redis_enabled and settings.redis_url:
+            logger.info("Initializing RedisCache")
+            _cache_instance = RedisCache(
+                redis_url=settings.redis_url,
+                ttl_seconds=settings.cache_ttl_seconds
+            )
+            await _cache_instance.connect()
+        else:
+            logger.info("Initializing LRUCache")
+            _cache_instance = LRUCache(
+                max_size=settings.cache_max_size,
+                ttl_seconds=settings.cache_ttl_seconds
+            )
+
+    return _cache_instance
+
+
+# Global queue instance (singleton)
+_queue_instance: Queue | None = None
+
+
+async def get_queue() -> Queue:
+    """
+    Get the global queue instance.
+
+    Returns:
+        RedisQueue for batch processing
+    """
+    global _queue_instance
+
+    if _queue_instance is None:
+        if settings.queue_enabled and settings.redis_url:
+            logger.info("Initializing RedisQueue")
+            _queue_instance = RedisQueue(redis_url=settings.redis_url)
+            await _queue_instance.connect()
+        else:
+            raise RuntimeError("Queue is required but not enabled in settings")
+
+    return _queue_instance
+
+
+async def get_url_repository() -> URLRepository:
+    """
+    Dependency injection factory for URL repository.
+
+    Returns:
+        SQLiteURLRepository configured from settings with connection pooling.
+        - SQLite (development): No pooling
+        - PostgreSQL (production): Full connection pooling for PgBouncer
+        Initialization is lazy - database connection created only when needed.
+    """
+    repo = SQLiteURLRepository(
+        db_url=settings.database_url,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_pool_max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+        pool_recycle=settings.db_pool_recycle,
+        pool_pre_ping=settings.db_pool_pre_ping,
+        echo_pool=settings.db_echo_pool
+    )
+    return repo
+
+
+async def get_url_service(
+    url_repo: URLRepository = Depends(get_url_repository),
+    id_generator: IDGenerator = Depends(get_id_generator),
+    cache: Cache = Depends(get_cache),
+    queue: Queue = Depends(get_queue)
+) -> URLService:
+    """
+    Dependency injection factory for URL service.
+
+    Returns:
+        URLService with cache-first and queue-based batch processing
+    """
+    return URLService(
+        url_repo=url_repo,
+        id_generator=id_generator,
+        cache=cache,
+        queue=queue,
+        base_domain=settings.base_domain,
+        base_url_scheme=settings.base_url_scheme
+    )

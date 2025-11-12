@@ -1,18 +1,91 @@
 {
   "version": 2,
+  "name": "url-shortener-microservices",
   "builds": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+      "src": "services/shorten/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb"
+      }
+    },
+    {
+      "src": "services/redirect/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb"
+      }
+    },
+    {
+      "src": "services/batch_processor/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb"
+      }
     }
   ],
   "routes": [
     {
+      "src": "/api/v1/shorten",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "/services/shorten/main.py",
+      "headers": {
+        "cache-control": "no-store, no-cache, must-revalidate"
+      }
+    },
+    {
+      "src": "/health/shorten",
+      "methods": ["GET"],
+      "dest": "/services/shorten/main.py"
+    },
+    {
+      "src": "/([a-zA-Z0-9]{7})",
+      "methods": ["GET", "OPTIONS"],
+      "dest": "/services/redirect/main.py"
+    },
+    {
+      "src": "/health/redirect",
+      "methods": ["GET"],
+      "dest": "/services/redirect/main.py"
+    },
+    {
+      "src": "/api/cron/process-batch",
+      "methods": ["POST"],
+      "dest": "/services/batch_processor/main.py"
+    },
+    {
+      "src": "/health/batch",
+      "methods": ["GET"],
+      "dest": "/services/batch_processor/main.py"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/api/index.py"
+      "dest": "/services/redirect/main.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/process-batch",
+      "schedule": "*/10 * * * *"
     }
   ],
   "env": {
-    "PYTHONUNBUFFERED": "1"
+    "PYTHONUNBUFFERED": "1",
+    "ENABLE_BACKGROUND_SCHEDULER": "false"
+  },
+  "regions": ["iad1"],
+  "functions": {
+    "services/shorten/main.py": {
+      "memory": 512,
+      "maxDuration": 10
+    },
+    "services/redirect/main.py": {
+      "memory": 256,
+      "maxDuration": 5
+    },
+    "services/batch_processor/main.py": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
   }
 }

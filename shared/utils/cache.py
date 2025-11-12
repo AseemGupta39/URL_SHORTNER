@@ -14,57 +14,22 @@ import threading
 class Cache(ABC):
     """
     Abstract base class for cache implementations.
-
-    Defines the interface that all cache implementations must follow.
-    This allows us to swap implementations (e.g., Redis, Memcached)
-    without changing the code that uses the cache.
+    Supports both sync (LRUCache) and async (RedisCache) operations.
     """
 
     @abstractmethod
-    def get(self, key: str) -> Optional[Any]:
-        """
-        Get value from cache.
-
-        Args:
-            key: Cache key
-
-        Returns:
-            Cached value if found, None otherwise
-        """
+    async def get_async(self, key: str) -> Optional[Any]:
+        """Get value from cache (async)."""
         pass
 
     @abstractmethod
-    def set(self, key: str, value: Any) -> None:
-        """
-        Store value in cache.
-
-        Args:
-            key: Cache key
-            value: Value to cache
-        """
+    async def set_async(self, key: str, value: Any) -> bool:
+        """Store value in cache (async)."""
         pass
 
     @abstractmethod
-    def delete(self, key: str) -> bool:
-        """
-        Delete entry from cache.
-
-        Args:
-            key: Cache key
-
-        Returns:
-            True if deleted, False if not found
-        """
-        pass
-
-    @abstractmethod
-    def clear(self) -> None:
-        """Clear all entries from cache."""
-        pass
-
-    @abstractmethod
-    def size(self) -> int:
-        """Get current number of entries in cache."""
+    async def delete_async(self, key: str) -> bool:
+        """Delete entry from cache (async)."""
         pass
 
     @abstractmethod
@@ -143,11 +108,9 @@ class LRUCache(Cache):
         self._misses = 0    # How many times item wasn't in cache
         self._evictions = 0 # How many times we removed old items
 
-    def get(self, key: str) -> Optional[Any]:
+    async def get_async(self, key: str) -> Optional[Any]:
         """
         Get a value from the cache.
-
-        This is the main method you'll use for lookups.
 
         Args:
             key: The short code (e.g., "abc123")
@@ -156,56 +119,52 @@ class LRUCache(Cache):
             The cached value (e.g., original URL) if found and not expired
             None if not in cache or expired
         """
-        with self._lock:  # Lock ensures thread safety
+        with self._lock:
             entry = self._cache.get(key)
 
-            # Case 1: Key not in cache at all
             if entry is None:
                 self._misses += 1
                 return None
 
-            # Case 2: Key exists but data is too old (expired)
             if entry.is_expired():
-                self._cache.pop(key)  # Remove expired entry
+                self._cache.pop(key)
                 self._misses += 1
                 return None
 
-            # Case 3: Key found and still fresh!
-            # Move to end to mark as "recently used" (for LRU)
             self._cache.move_to_end(key)
             self._hits += 1
             return entry.value
 
-    def set(self, key: str, value: Any) -> None:
+    async def set_async(self, key: str, value: Any) -> bool:
         """
         Store a value in the cache.
 
         Args:
             key: The short code (e.g., "abc123")
             value: The data to cache (e.g., original URL)
+
+        Returns:
+            True if successful
         """
         with self._lock:
-            # Calculate when this entry should expire
             expires_at = datetime.utcnow() + timedelta(seconds=self.ttl_seconds)
             entry = CacheEntry(value=value, expires_at=expires_at)
 
-            # If key already exists, update it and mark as recently used
             if key in self._cache:
                 self._cache[key] = entry
                 self._cache.move_to_end(key)
             else:
-                # Add new entry
                 self._cache[key] = entry
 
-                # If cache is full, remove the OLDEST item (LRU eviction)
-                # popitem(last=False) removes first item = least recently used
                 if len(self._cache) > self.max_size:
                     self._cache.popitem(last=False)
                     self._evictions += 1
 
-    def delete(self, key: str) -> bool:
+            return True
+
+    async def delete_async(self, key: str) -> bool:
         """
-        Remove an entry from cache (useful when URL is deleted).
+        Remove an entry from cache.
 
         Args:
             key: The short code to remove

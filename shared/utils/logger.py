@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 # Import after other imports to avoid circular dependency
-from app.utils import request_context
+from shared.utils import request_context
 
 
 class AppLogger:
