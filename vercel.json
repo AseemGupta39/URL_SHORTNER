@@ -1,6 +1,20 @@
 {
   "version": 2,
   "name": "url-shortener-microservices",
+  "builds": [
+    {
+      "src": "services/shorten/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "services/redirect/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "services/batch_processor/main.py",
+      "use": "@vercel/python"
+    }
+  ],
   "routes": [
     {
       "src": "/api/v1/shorten",
