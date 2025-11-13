@@ -30,14 +30,19 @@
       "dest": "/services/shorten/main.py"
     },
     {
-      "src": "/([a-zA-Z0-9]{7})",
-      "methods": ["GET", "OPTIONS"],
-      "dest": "/services/redirect/main.py"
+      "src": "/docs/shorten",
+      "methods": ["GET"],
+      "dest": "/services/shorten/main.py"
     },
     {
-      "src": "/health/redirect",
+      "src": "/redoc/shorten",
       "methods": ["GET"],
-      "dest": "/services/redirect/main.py"
+      "dest": "/services/shorten/main.py"
+    },
+    {
+      "src": "/openapi.json",
+      "methods": ["GET"],
+      "dest": "/services/shorten/main.py"
     },
     {
       "src": "/api/cron/process-batch",
@@ -50,7 +55,23 @@
       "dest": "/services/batch_processor/main.py"
     },
     {
-      "src": "/(.*)",
+      "src": "/health/redirect",
+      "methods": ["GET"],
+      "dest": "/services/redirect/main.py"
+    },
+    {
+      "src": "/docs",
+      "methods": ["GET"],
+      "dest": "/services/redirect/main.py"
+    },
+    {
+      "src": "/redoc",
+      "methods": ["GET"],
+      "dest": "/services/redirect/main.py"
+    },
+    {
+      "src": "/([a-zA-Z0-9]{7})",
+      "methods": ["GET", "OPTIONS"],
       "dest": "/services/redirect/main.py"
     }
   ],
