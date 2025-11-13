@@ -1,10 +1,19 @@
 // API Configuration
 // Automatically detects environment:
-// - Development: http://localhost:8000
+// - Development: http://localhost:8001 (Shorten Service)
 // - Production: https://url-shortner-backend-chi.vercel.app
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
+const isDevelopment =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '0.0.0.0' ||
+    window.location.hostname === '';
+
+const API_BASE_URL = isDevelopment
+    ? 'http://localhost:8001'
     : 'https://url-shortner-backend-chi.vercel.app';
+
+console.log('Environment:', isDevelopment ? 'Development' : 'Production');
+console.log('API_BASE_URL:', API_BASE_URL);
 
 // Initialize logger (loaded from logger.js)
 // Automatically set log level based on environment
@@ -89,13 +98,10 @@ async function shortenUrl(longUrl) {
         }
 
         const data = await response.json();
-        logger.debug('API response parsed successfully', { shortCode: data.short_code });
+        logger.debug('API response parsed successfully', { shortCode: data.short_code, shortUrl: data.short_url });
 
-        // Build the short URL
-        // The API returns the short_code, we need to construct the full URL
-        const shortUrl = `${API_BASE_URL}/${data.short_code}`;
-
-        return shortUrl;
+        // Use the short_url returned by the API (points to redirect service on correct port)
+        return data.short_url;
     } catch (error) {
         if (error.message.includes('fetch')) {
             logger.error('Failed to connect to backend server', { baseUrl: API_BASE_URL });
@@ -113,7 +119,15 @@ async function handleCopy() {
     logger.debug('Copy button clicked', { shortUrl });
 
     try {
-        await navigator.clipboard.writeText(shortUrl);
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(shortUrl);
+        } else {
+            // Fallback for older browsers or non-secure contexts
+            shortUrlInput.select();
+            document.execCommand('copy');
+        }
+
         logger.info('Short URL copied to clipboard', { shortUrl });
 
         // Visual feedback
@@ -136,8 +150,10 @@ async function handleCopy() {
             copyBtn.classList.remove('copy-success');
         }, 2000);
     } catch (error) {
-        logger.error('Failed to copy to clipboard', { error: error.message });
-        showError('Failed to copy to clipboard');
+        logger.warning('Clipboard API failed, user must copy manually', { error: error.message });
+        // Select the text so user can copy manually
+        shortUrlInput.select();
+        showError('Please copy the URL manually (Ctrl+C or Cmd+C)');
     }
 }
 
