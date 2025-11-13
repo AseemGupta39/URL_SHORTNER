@@ -1,29 +1,6 @@
 {
   "version": 2,
   "name": "url-shortener-microservices",
-  "builds": [
-    {
-      "src": "services/shorten/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb"
-      }
-    },
-    {
-      "src": "services/redirect/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb"
-      }
-    },
-    {
-      "src": "services/batch_processor/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb"
-      }
-    }
-  ],
   "routes": [
     {
       "src": "/api/v1/shorten",
@@ -77,15 +54,18 @@
   "functions": {
     "services/shorten/main.py": {
       "memory": 512,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "maxSize": "15mb"
     },
     "services/redirect/main.py": {
       "memory": 256,
-      "maxDuration": 5
+      "maxDuration": 5,
+      "maxSize": "15mb"
     },
     "services/batch_processor/main.py": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "maxSize": "15mb"
     }
   }
 }
