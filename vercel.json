@@ -54,18 +54,15 @@
   "functions": {
     "services/shorten/main.py": {
       "memory": 512,
-      "maxDuration": 10,
-      "maxSize": "15mb"
+      "maxDuration": 10
     },
     "services/redirect/main.py": {
       "memory": 256,
-      "maxDuration": 5,
-      "maxSize": "15mb"
+      "maxDuration": 5
     },
     "services/batch_processor/main.py": {
       "memory": 1024,
-      "maxDuration": 60,
-      "maxSize": "15mb"
+      "maxDuration": 60
     }
   }
 }
