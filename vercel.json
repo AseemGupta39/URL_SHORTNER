@@ -43,7 +43,7 @@
   "crons": [
     {
       "path": "/api/cron/process-batch",
-      "schedule": "0 */12 * * *"
+      "schedule": "0 0 * * *"
     }
   ],
   "env": {
