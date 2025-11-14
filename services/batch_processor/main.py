@@ -36,9 +36,9 @@ app = FastAPI(
     title="Batch Processor Service",
     version="1.0.0",
     description="Processes queued URL insertions in batches",
-    docs_url="/docs/batch",
-    redoc_url="/redoc/batch",
-    openapi_url="/openapi.json/batch"
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 # Global instances (initialized in startup event)

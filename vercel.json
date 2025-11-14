@@ -30,42 +30,12 @@
       "dest": "/services/shorten/main.py"
     },
     {
-      "src": "/docs/shorten",
-      "methods": ["GET"],
-      "dest": "/services/shorten/main.py"
-    },
-    {
-      "src": "/redoc/shorten",
-      "methods": ["GET"],
-      "dest": "/services/shorten/main.py"
-    },
-    {
-      "src": "/openapi.json/shorten",
-      "methods": ["GET"],
-      "dest": "/services/shorten/main.py"
-    },
-    {
       "src": "/api/cron/process-batch",
       "methods": ["POST"],
       "dest": "/services/batch_processor/main.py"
     },
     {
       "src": "/health/batch",
-      "methods": ["GET"],
-      "dest": "/services/batch_processor/main.py"
-    },
-    {
-      "src": "/docs/batch",
-      "methods": ["GET"],
-      "dest": "/services/batch_processor/main.py"
-    },
-    {
-      "src": "/redoc/batch",
-      "methods": ["GET"],
-      "dest": "/services/batch_processor/main.py"
-    },
-    {
-      "src": "/openapi.json/batch",
       "methods": ["GET"],
       "dest": "/services/batch_processor/main.py"
     },

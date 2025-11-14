@@ -37,9 +37,9 @@ app = FastAPI(
     title="URL Shortener - Shorten Service",
     description="Service for creating short URLs with unique IDs",
     version="1.0.0",
-    docs_url="/docs/shorten",
-    redoc_url="/redoc/shorten",
-    openapi_url="/openapi.json/shorten"
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 # Configure CORS
