@@ -9,19 +9,35 @@ from pathlib import Path
 # Add parent directory to path so we can import services
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import RedirectResponse
-from pydantic import HttpUrl
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from services.shorten.main import app as shorten_app
 from services.redirect.main import app as redirect_app
 
-# Create main app that mounts both services
-app = FastAPI(title="URL Shortener API")
+# Create main app with disabled docs (we'll use sub-app docs)
+app = FastAPI(
+    title="URL Shortener API Gateway",
+    description="Unified API for URL shortening and redirect services",
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None
+)
 
-# Mount shorten service at /shorten
-app.mount("/shorten", shorten_app)
+# Configure CORS for main app
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Mount redirect service at root for short URL resolution
+# Mount services with proper paths
+# Shorten service mounted at /api - exposes docs at /api/docs
+app.mount("/api", shorten_app)
+
+# Redirect service mounted at root - exposes docs at /docs
+# This must be last as it catches all remaining routes including /{short_code}
 app.mount("/", redirect_app)
 
 # Export for Vercel

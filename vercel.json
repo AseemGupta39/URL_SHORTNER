@@ -3,66 +3,22 @@
   "name": "url-shortener-microservices",
   "builds": [
     {
-      "src": "services/shorten/main.py",
+      "src": "api/index.py",
       "use": "@vercel/python"
     },
     {
-      "src": "services/redirect/main.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "services/batch_processor/main.py",
+      "src": "api/batch_processor.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/api/v1/shorten",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "/services/shorten/main.py",
-      "headers": {
-        "cache-control": "no-store, no-cache, must-revalidate"
-      }
-    },
-    {
-      "src": "/health/shorten",
-      "methods": ["GET"],
-      "dest": "/services/shorten/main.py"
-    },
-    {
       "src": "/api/cron/process-batch",
-      "methods": ["POST"],
-      "dest": "/services/batch_processor/main.py"
+      "dest": "/api/batch_processor.py"
     },
     {
-      "src": "/health/batch",
-      "methods": ["GET"],
-      "dest": "/services/batch_processor/main.py"
-    },
-    {
-      "src": "/health/redirect",
-      "methods": ["GET"],
-      "dest": "/services/redirect/main.py"
-    },
-    {
-      "src": "/docs",
-      "methods": ["GET"],
-      "dest": "/services/redirect/main.py"
-    },
-    {
-      "src": "/redoc",
-      "methods": ["GET"],
-      "dest": "/services/redirect/main.py"
-    },
-    {
-      "src": "/openapi.json",
-      "methods": ["GET"],
-      "dest": "/services/redirect/main.py"
-    },
-    {
-      "src": "/([a-zA-Z0-9]{7})",
-      "methods": ["GET", "OPTIONS"],
-      "dest": "/services/redirect/main.py"
+      "src": "/(.*)",
+      "dest": "/api/index.py"
     }
   ],
   "crons": [
