@@ -164,6 +164,56 @@ async def health_check():
     return {"status": "healthy", "service": "batch_processor"}
 
 
+@app.get("/status")
+async def get_status():
+    """
+    Get batch processor status and queue information.
+
+    Returns queue size, configuration, and last processing stats.
+    """
+    try:
+        if not settings.queue_enabled:
+            return {
+                "status": "disabled",
+                "message": "Queue is not enabled",
+                "queue_size": 0,
+                "config": {
+                    "queue_enabled": False,
+                    "batch_size": settings.batch_size,
+                    "batch_interval_seconds": settings.batch_interval_seconds
+                }
+            }
+
+        if not redis_queue:
+            return {
+                "status": "error",
+                "message": "Redis queue not initialized",
+                "queue_size": 0
+            }
+
+        queue_size = await redis_queue.size()
+
+        return {
+            "status": "healthy",
+            "service": "batch_processor",
+            "queue_enabled": settings.queue_enabled,
+            "queue_size": queue_size,
+            "config": {
+                "batch_size": settings.batch_size,
+                "batch_interval_seconds": settings.batch_interval_seconds,
+                "cron_schedule": "Daily at midnight (0 0 * * *)"
+            },
+            "info": "Use POST /api/cron/process-batch to manually trigger processing"
+        }
+    except Exception as e:
+        logger.error(f"Failed to get batch status: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "queue_size": 0
+        }
+
+
 @app.post("/api/cron/process-batch")
 async def process_batch():
     """
