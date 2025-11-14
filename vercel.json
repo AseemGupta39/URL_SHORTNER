@@ -3,7 +3,11 @@
   "name": "url-shortener-microservices",
   "builds": [
     {
-      "src": "api/index.py",
+      "src": "api/shorten.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/redirect.py",
       "use": "@vercel/python"
     },
     {
@@ -13,12 +17,20 @@
   ],
   "routes": [
     {
+      "src": "/api/shorten/(.*)",
+      "dest": "/api/shorten.py"
+    },
+    {
+      "src": "/api/redirect/(.*)",
+      "dest": "/api/redirect.py"
+    },
+    {
       "src": "/api/cron/process-batch",
       "dest": "/api/batch_processor.py"
     },
     {
       "src": "/(.*)",
-      "dest": "/api/index.py"
+      "dest": "/api/redirect.py"
     }
   ],
   "crons": [

@@ -81,7 +81,7 @@ async function shortenUrl(longUrl) {
     logger.debug('Sending API request to shorten URL', { url: longUrl });
 
     try {
-        const response = await fetch(`${API_BASE_URL}/v1/shorten`, {
+        const response = await fetch(`${API_BASE_URL}/api/shorten/v1/shorten`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
