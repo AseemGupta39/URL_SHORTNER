@@ -214,7 +214,7 @@ async def get_status():
         }
 
 
-@app.post("/api/cron/process-batch")
+@app.post("/process-batch")
 async def process_batch():
     """
     Process a batch of URLs from the queue and insert into database.
