@@ -41,12 +41,38 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Global instances (initialized in startup event)
+# Global instances (initialized in startup event or lazily)
 url_repo: URLRepository = None
 redis_queue = None
 
 # Background task control
 background_task = None
+
+
+async def ensure_queue_initialized():
+    """Ensure Redis queue is initialized (lazy initialization for serverless)."""
+    global redis_queue
+
+    if redis_queue is None and settings.queue_enabled:
+        logger.info("Lazy-initializing Redis queue for serverless environment")
+        redis_queue = get_redis_queue(settings.redis_url)
+        await redis_queue.connect()
+        logger.info("Redis queue initialized successfully")
+
+    return redis_queue
+
+
+async def ensure_repo_initialized():
+    """Ensure URL repository is initialized (lazy initialization for serverless)."""
+    global url_repo
+
+    if url_repo is None:
+        logger.info("Lazy-initializing URL repository for serverless environment")
+        url_repo = await get_url_repository()
+        await url_repo.initialize()
+        logger.info("URL repository initialized successfully")
+
+    return url_repo
 
 
 async def background_batch_processor():
@@ -190,19 +216,21 @@ async def get_status():
                 }
             }
 
-        if not redis_queue:
+        # Lazy-initialize queue for serverless
+        queue = await ensure_queue_initialized()
+
+        if not queue:
             return {
                 "status": "error",
-                "message": "Redis queue not initialized (startup event may not have run)",
+                "message": "Failed to initialize Redis queue",
                 "queue_size": 0,
                 "debug": {
                     "queue_enabled": settings.queue_enabled,
-                    "redis_url_set": bool(settings.redis_url),
-                    "redis_queue_obj": str(type(redis_queue))
+                    "redis_url_set": bool(settings.redis_url)
                 }
             }
 
-        queue_size = await redis_queue.size()
+        queue_size = await queue.size()
 
         return {
             "status": "healthy",
@@ -235,8 +263,12 @@ async def process_batch():
     Returns:
         JSON with processing statistics
     """
-    if not redis_queue:
-        raise HTTPException(status_code=503, detail="Queue not enabled")
+    # Lazy-initialize queue and repo for serverless
+    queue = await ensure_queue_initialized()
+    repo = await ensure_repo_initialized()
+
+    if not queue:
+        raise HTTPException(status_code=503, detail="Queue not enabled or failed to initialize")
 
     # Generate unique batch ID (first 12 chars of UUID for tracking)
     batch_id = str(uuid.uuid4())[:12]
@@ -245,7 +277,7 @@ async def process_batch():
     start_time = datetime.now()
 
     try:
-        queue_size = await redis_queue.size()
+        queue_size = await queue.size()
         logger.info(f"Processing batch (queue_size={queue_size})")
 
         if queue_size == 0:
@@ -261,7 +293,7 @@ async def process_batch():
                 }
             )
 
-        items = await redis_queue.dequeue(count=settings.batch_size)
+        items = await queue.dequeue(count=settings.batch_size)
 
         if not items:
             return JSONResponse(
@@ -303,12 +335,12 @@ async def process_batch():
                 }
             )
 
-        inserted_count = await url_repo.batch_create(url_data_list)
+        inserted_count = await repo.batch_create(url_data_list)
 
         end_time = datetime.now()
         duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
-        remaining_queue_size = await redis_queue.size()
+        remaining_queue_size = await queue.size()
 
         logger.info(
             f"Batch processed: {inserted_count} URLs inserted "
