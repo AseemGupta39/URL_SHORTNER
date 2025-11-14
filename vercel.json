@@ -25,7 +25,11 @@
       "dest": "/api/redirect.py"
     },
     {
-      "src": "/api/cron/process-batch",
+      "src": "/api/batch/(.*)",
+      "dest": "/api/batch_processor.py"
+    },
+    {
+      "src": "/api/cron/(.*)",
       "dest": "/api/batch_processor.py"
     },
     {
