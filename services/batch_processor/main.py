@@ -172,6 +172,10 @@ async def get_status():
     Returns queue size, configuration, and last processing stats.
     """
     try:
+        # Debug info about queue_enabled
+        import os
+        queue_enabled_env = os.getenv("QUEUE_ENABLED", "not set")
+
         if not settings.queue_enabled:
             return {
                 "status": "disabled",
@@ -179,6 +183,8 @@ async def get_status():
                 "queue_size": 0,
                 "config": {
                     "queue_enabled": False,
+                    "queue_enabled_env_value": queue_enabled_env,
+                    "queue_enabled_type": str(type(settings.queue_enabled)),
                     "batch_size": settings.batch_size,
                     "batch_interval_seconds": settings.batch_interval_seconds
                 }
@@ -187,8 +193,13 @@ async def get_status():
         if not redis_queue:
             return {
                 "status": "error",
-                "message": "Redis queue not initialized",
-                "queue_size": 0
+                "message": "Redis queue not initialized (startup event may not have run)",
+                "queue_size": 0,
+                "debug": {
+                    "queue_enabled": settings.queue_enabled,
+                    "redis_url_set": bool(settings.redis_url),
+                    "redis_queue_obj": str(type(redis_queue))
+                }
             }
 
         queue_size = await redis_queue.size()
