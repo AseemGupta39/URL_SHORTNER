@@ -1,7 +1,7 @@
 // API Configuration
 // Automatically detects environment:
 // - Development: http://localhost:8001 (Shorten Service)
-// - Production: https://url-shortner-backend-chi.vercel.app
+// - Production: AWS Backend (TODO: Update after AWS deployment)
 const isDevelopment =
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1' ||
@@ -10,7 +10,7 @@ const isDevelopment =
 
 const API_BASE_URL = isDevelopment
     ? 'http://localhost:8001'
-    : 'https://url-shortner-backend-chi.vercel.app';
+    : 'https://YOUR-AWS-API-GATEWAY-OR-ALB-URL.com';  // TODO: Update after AWS deployment
 
 console.log('Environment:', isDevelopment ? 'Development' : 'Production');
 console.log('API_BASE_URL:', API_BASE_URL);
@@ -81,7 +81,7 @@ async function shortenUrl(longUrl) {
     logger.debug('Sending API request to shorten URL', { url: longUrl });
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/shorten/v1/shorten`, {
+        const response = await fetch(`${API_BASE_URL}/v1/shorten`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
