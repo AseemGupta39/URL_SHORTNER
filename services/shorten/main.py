@@ -26,6 +26,7 @@ from shared.config.dependencies import get_url_service
 from shared.core.services import URLService
 from shared.core.schemas import ShortenRequest, ShortenResponse
 from shared.utils.logger import AppLogger, get_logger
+from shared.middleware.request_id import RequestIDMiddleware
 
 # Setup application logger
 log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -41,6 +42,9 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json"
 )
+
+# Add Request ID middleware (must be added before CORS)
+app.add_middleware(RequestIDMiddleware)
 
 # Configure CORS
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]

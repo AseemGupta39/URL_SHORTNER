@@ -26,6 +26,7 @@ from shared.config.dependencies import get_url_service
 from shared.core.services import URLService
 from shared.core.exceptions import ShortCodeNotFoundException
 from shared.utils.logger import AppLogger, get_logger
+from shared.middleware.request_id import RequestIDMiddleware
 
 # Setup application logger
 log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -40,6 +41,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Add Request ID middleware (must be added before CORS)
+app.add_middleware(RequestIDMiddleware)
 
 # Configure CORS (lightweight for redirects)
 app.add_middleware(

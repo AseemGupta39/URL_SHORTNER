@@ -28,6 +28,7 @@ from shared.core.schemas import URLData
 from shared.core.queue_messages import URLQueueMessage
 from shared.utils.logger import get_logger
 from shared.utils import request_context
+from shared.middleware.request_id import RequestIDMiddleware
 
 logger = get_logger()
 settings = get_settings()
@@ -40,6 +41,9 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json"
 )
+
+# Add Request ID middleware for HTTP endpoints
+app.add_middleware(RequestIDMiddleware)
 
 # Global instances (initialized in startup event or lazily)
 url_repo: URLRepository = None
