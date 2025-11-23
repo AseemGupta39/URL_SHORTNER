@@ -16,22 +16,36 @@ from shared.utils.logger import get_logger
 logger = get_logger()
 
 
+# Global ID generator instance (singleton)
+_id_generator_instance: IDGenerator | None = None
+
+
 async def get_id_generator() -> IDGenerator:
     """
-    Dependency injection factory for ID generator.
+    Get the global ID generator instance (singleton).
+
+    IMPORTANT: Must be singleton to maintain sequence state across requests.
+    Creating a new instance per request would reset sequence to 0,
+    causing duplicate IDs for concurrent requests in the same second.
 
     Returns:
         SnowflakeIDGenerator configured from settings
     """
-    return SnowflakeIDGenerator(
-        datacenter_id=settings.datacenter_id,
-        worker_id=settings.worker_id,
-        epoch_sec=settings.epoch_sec,
-        timestamp_bits=settings.timestamp_bits,
-        datacenter_bits=settings.datacenter_bits,
-        worker_bits=settings.worker_bits,
-        sequence_bits=settings.sequence_bits
-    )
+    global _id_generator_instance
+
+    if _id_generator_instance is None:
+        logger.info("Initializing SnowflakeIDGenerator (singleton)")
+        _id_generator_instance = SnowflakeIDGenerator(
+            datacenter_id=settings.datacenter_id,
+            worker_id=settings.worker_id,
+            epoch_sec=settings.epoch_sec,
+            timestamp_bits=settings.timestamp_bits,
+            datacenter_bits=settings.datacenter_bits,
+            worker_bits=settings.worker_bits,
+            sequence_bits=settings.sequence_bits
+        )
+
+    return _id_generator_instance
 
 
 # Global cache instance (singleton)
