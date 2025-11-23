@@ -146,9 +146,8 @@ async def startup_event():
 
     logger.info("Batch Processor Service starting up")
 
-    # Initialize repository with connection pooling
+    # Get repository instance (will be initialized by singleton on first call)
     url_repo = await get_url_repository()
-    await url_repo.initialize()
 
     # Initialize queue if enabled
     if settings.queue_enabled:
@@ -161,7 +160,7 @@ async def startup_event():
         logger.info("Starting background scheduler (dev mode)")
         background_task = asyncio.create_task(background_batch_processor())
     else:
-        logger.info("Background scheduler disabled (using Vercel Cron)")
+        logger.info("Background scheduler disabled (production: use cron or scheduler)")
 
 
 @app.on_event("shutdown")

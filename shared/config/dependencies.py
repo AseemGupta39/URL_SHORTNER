@@ -103,26 +103,43 @@ async def get_queue() -> Queue:
     return _queue_instance
 
 
+# Global URL repository instance (singleton)
+_url_repository_instance: URLRepository | None = None
+
+
 async def get_url_repository() -> URLRepository:
     """
-    Dependency injection factory for URL repository.
+    Get the global URL repository instance (singleton).
+
+    IMPORTANT: Must be singleton to reuse database connection pool.
+    Creating a new instance per request would create a new engine with
+    its own connection pool, wasting database connections.
 
     Returns:
         SQLiteURLRepository configured from settings with connection pooling.
         - SQLite (development): No pooling
         - PostgreSQL (production): Full connection pooling for PgBouncer
-        Initialization is lazy - database connection created only when needed.
     """
-    repo = SQLiteURLRepository(
-        db_url=settings.database_url,
-        pool_size=settings.db_pool_size,
-        max_overflow=settings.db_pool_max_overflow,
-        pool_timeout=settings.db_pool_timeout,
-        pool_recycle=settings.db_pool_recycle,
-        pool_pre_ping=settings.db_pool_pre_ping,
-        echo_pool=settings.db_echo_pool
-    )
-    return repo
+    global _url_repository_instance
+
+    if _url_repository_instance is None:
+        logger.info("Initializing URLRepository (singleton)")
+        _url_repository_instance = SQLiteURLRepository(
+            db_url=settings.database_url,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_pool_max_overflow,
+            pool_timeout=settings.db_pool_timeout,
+            pool_recycle=settings.db_pool_recycle,
+            pool_pre_ping=settings.db_pool_pre_ping,
+            echo_pool=settings.db_echo_pool
+        )
+        await _url_repository_instance.initialize()
+
+    return _url_repository_instance
+
+
+# Global URL service instance (singleton)
+_url_service_instance: URLService | None = None
 
 
 async def get_url_service(
@@ -132,16 +149,25 @@ async def get_url_service(
     queue: Queue = Depends(get_queue)
 ) -> URLService:
     """
-    Dependency injection factory for URL service.
+    Get the global URL service instance (singleton).
+
+    IMPORTANT: Must be singleton for consistency and to avoid
+    creating unnecessary service objects per request.
 
     Returns:
         URLService with cache-first and queue-based batch processing
     """
-    return URLService(
-        url_repo=url_repo,
-        id_generator=id_generator,
-        cache=cache,
-        queue=queue,
-        base_domain=settings.base_domain,
-        base_url_scheme=settings.base_url_scheme
-    )
+    global _url_service_instance
+
+    if _url_service_instance is None:
+        logger.info("Initializing URLService (singleton)")
+        _url_service_instance = URLService(
+            url_repo=url_repo,
+            id_generator=id_generator,
+            cache=cache,
+            queue=queue,
+            base_domain=settings.base_domain,
+            base_url_scheme=settings.base_url_scheme
+        )
+
+    return _url_service_instance
