@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+url_shortener_venv/
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in container)
+*.md
+MIGRATION_VERCEL_TO_AWS.md
+ANALYTICS_PLAN.md
+DEPLOYMENT*.md
+LOAD_BALANCING.md
+MICROSERVICES_MIGRATION_PLAN.md
+PGBOUNCER_SETUP.md
+VERCEL_MICROSERVICES_PLAN.md
+claude_response.md
+current_memory*.md
+
+# Logs
+*.log
+logs/
+
+# Environment files (use docker-compose environment instead)
+.env
+.env.*
+
+# Frontend (not needed for backend services)
+frontend/
+
+# API wrappers (Vercel-specific, deleted)
+api/
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Vercel config (not needed)
+vercel.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp

@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: url-shortener-db
+    environment:
+      POSTGRES_DB: url_shortener
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - url-shortener-network
+
+  # Redis Queue
+  redis:
+    image: redis:7-alpine
+    container_name: url-shortener-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - url-shortener-network
+
+  # Shorten Service
+  shorten:
+    build:
+      context: .
+      dockerfile: services/shorten/Dockerfile
+    container_name: url-shortener-shorten
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/url_shortener
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_ENABLED=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8001
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - url-shortener-network
+    restart: unless-stopped
+
+  # Redirect Service
+  redirect:
+    build:
+      context: .
+      dockerfile: services/redirect/Dockerfile
+    container_name: url-shortener-redirect
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/url_shortener
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8002
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - url-shortener-network
+    restart: unless-stopped
+
+  # Batch Processor Service
+  batch_processor:
+    build:
+      context: .
+      dockerfile: services/batch_processor/Dockerfile
+    container_name: url-shortener-batch
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/url_shortener
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_ENABLED=true
+      - ENABLE_BACKGROUND_SCHEDULER=true
+      - BATCH_SIZE=100
+      - BATCH_INTERVAL_SECONDS=10
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8003
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - url-shortener-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  url-shortener-network:
+    driver: bridge

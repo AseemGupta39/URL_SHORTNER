@@ -151,3 +151,8 @@ cython_debug/
 # Logs
 logs/
 *.log
+
+# Private documentation (not to be shared)
+MIGRATION_VERCEL_TO_AWS.md
+
+*.md
