@@ -5,7 +5,7 @@ uvicorn[standard]==0.34.0
 # Database
 sqlalchemy==2.0.36
 aiosqlite==0.20.0
-asyncpg==0.30.0  # PostgreSQL driver for production
+asyncpg==0.30.0  # Async PostgreSQL driver for production
 
 # Redis (for distributed cache and queue)
 redis==5.0.1
