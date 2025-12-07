@@ -23,7 +23,7 @@ from shared.core.services import URLService
 from shared.core.schemas import URLData
 from shared.core.exceptions import ShortCodeNotFoundException
 from shared.data.repositories import SQLiteURLRepository
-from shared.utils.id_generator import SnowflakeIDGenerator
+from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.utils.redis_cache import RedisCache
 from shared.utils.redis_queue import RedisQueue
 

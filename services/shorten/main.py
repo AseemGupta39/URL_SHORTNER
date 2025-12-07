@@ -16,17 +16,15 @@ load_dotenv(env_file, override=True)
 project_root = service_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
 from shared.config.settings import settings
-from shared.config.dependencies import get_url_service
-from shared.core.services import URLService
-from shared.core.schemas import ShortenRequest, ShortenResponse
 from shared.utils.logger import AppLogger, get_logger
 from shared.middleware.request_id import RequestIDMiddleware
+from services.shorten.controllers import url_router
 
 # Setup application logger
 log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -56,7 +54,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check endpoint
+# Health check endpoint (kept in main.py - see ARCHITECTURE.md for reasoning)
+# IMPORTANT: Must be defined BEFORE including url_router to ensure proper route precedence
 @app.get("/health")
 async def health_check():
     """Health check for load balancer."""
@@ -67,20 +66,8 @@ async def health_check():
         "worker_id": settings.worker_id
     }
 
-# Shorten endpoint (only this service handles shortening)
-@app.post("/v1/shorten", response_model=ShortenResponse, tags=["Shorten"])
-async def shorten_url(
-    request: ShortenRequest,
-    url_service: URLService = Depends(get_url_service)
-):
-    """
-    Create a short URL from a long URL.
-
-    This service uses Snowflake ID generation with unique DATACENTER_ID/WORKER_ID.
-    """
-    logger.info(f"Shortening URL: {request.original_url}")
-    result = await url_service.shorten(request.original_url)
-    return result
+# Include API routers
+app.include_router(url_router)
 
 logger.info(f"Shorten Service started (DC={settings.datacenter_id}, W={settings.worker_id})")
 

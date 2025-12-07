@@ -4,12 +4,14 @@ Dependency injection factories for FastAPI.
 from fastapi import Depends
 
 from shared.config.settings import settings
-from shared.utils.id_generator import IDGenerator, SnowflakeIDGenerator
+from shared.utils.interfaces.id_generator import IDGenerator
+from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.data.repositories import URLRepository, SQLiteURLRepository
 from shared.core.services import URLService
-from shared.utils.cache import Cache, LRUCache
+from shared.utils.interfaces.cache import Cache
+from shared.utils.lru_cache import LRUCache
 from shared.utils.redis_cache import RedisCache
-from shared.utils.queue import Queue
+from shared.utils.interfaces.queue import Queue
 from shared.utils.redis_queue import RedisQueue
 from shared.utils.logger import get_logger
 

@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import redis.asyncio as aioredis
 from typing import Optional, Dict, Any
-from shared.utils.cache import Cache
+from shared.utils.interfaces.cache import Cache
 from shared.core.schemas import URLData
 from shared.utils.logger import get_logger
 

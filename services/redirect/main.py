@@ -16,17 +16,14 @@ load_dotenv(env_file, override=True)
 project_root = service_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse as FastAPIRedirect
 import logging
 
 from shared.config.settings import settings
-from shared.config.dependencies import get_url_service
-from shared.core.services import URLService
-from shared.core.exceptions import ShortCodeNotFoundException
 from shared.utils.logger import AppLogger, get_logger
 from shared.middleware.request_id import RequestIDMiddleware
+from services.redirect.controllers import redirect_router
 
 # Setup application logger
 log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -54,7 +51,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check endpoint
+# Health check endpoint (kept in main.py - see ARCHITECTURE.md for reasoning)
+# IMPORTANT: Must be defined BEFORE including redirect_router (which has catch-all /{short_code})
 @app.get("/health")
 async def health_check():
     """Health check for load balancer."""
@@ -63,28 +61,8 @@ async def health_check():
         "status": "healthy"
     }
 
-# Redirect endpoint (only this service handles redirects)
-@app.get("/{short_code}", tags=["Redirect"])
-async def redirect_url(
-    short_code: str,
-    url_service: URLService = Depends(get_url_service)
-):
-    """
-    Redirect to original URL using short code.
-
-    Returns 302 redirect to original URL.
-    Raises 404 if short code not found.
-    """
-    try:
-        logger.info(f"Resolving short code: {short_code}")
-        result = await url_service.resolve(short_code)
-        return FastAPIRedirect(
-            url=str(result.original_url),
-            status_code=302
-        )
-    except ShortCodeNotFoundException:
-        logger.warning(f"Short code not found: {short_code}")
-        raise HTTPException(status_code=404, detail="Short code not found")
+# Include API routers
+app.include_router(redirect_router)
 
 logger.info("Redirect Service started")
 

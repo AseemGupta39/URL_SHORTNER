@@ -6,7 +6,8 @@ import pytest
 import asyncio
 from datetime import datetime
 
-from shared.utils.cache import LRUCache, Cache
+from shared.utils.lru_cache import LRUCache
+from shared.utils.interfaces.cache import Cache
 from shared.core.schemas import URLData
 
 

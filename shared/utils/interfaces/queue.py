@@ -1,5 +1,7 @@
 """
-Queue abstraction for async batch processing.
+Queue Interface
+
+Abstract base class for queue implementations.
 """
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any

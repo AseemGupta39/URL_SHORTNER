@@ -8,9 +8,9 @@ from pydantic import HttpUrl
 from shared.core.schemas import URLData, ShortenResponse, RedirectResponse
 from shared.core.queue_messages import URLQueueMessage
 from shared.data.repositories import URLRepository
-from shared.utils.id_generator import IDGenerator
-from shared.utils.cache import Cache
-from shared.utils.queue import Queue
+from shared.utils.interfaces.id_generator import IDGenerator
+from shared.utils.interfaces.cache import Cache
+from shared.utils.interfaces.queue import Queue
 from shared.core.exceptions import ShortCodeNotFoundException
 from shared.utils.logger import get_logger
 
