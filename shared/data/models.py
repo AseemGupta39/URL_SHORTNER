@@ -13,7 +13,7 @@ class URLModel(Base):
 
     __tablename__ = "urls"
 
-    short_code = Column(String(7), primary_key=True)
+    short_code = Column(String(8), primary_key=True)
     original_url = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False)
 

@@ -19,8 +19,8 @@ class ShortenResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "short_code": "abc1234",
-                "short_url": "https://short.ly/abc1234",
+                "short_code": "abc12345",
+                "short_url": "https://short.ly/abc12345",
                 "created_at": "2024-01-15T10:30:00Z"
             }
         }
@@ -49,7 +49,7 @@ class URLData(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "short_code": "abc1234",
+                "short_code": "abc12345",
                 "original_url": "https://example.com/very/long/path",
                 "created_at": "2024-01-15T10:30:00Z"
             }

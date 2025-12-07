@@ -68,10 +68,10 @@ services:
       - DATACENTER_ID=0
       - WORKER_ID=0
       - EPOCH_SEC=1704067200
-      - TIMESTAMP_BITS=28
+      - TIMESTAMP_BITS=31
       - DATACENTER_BITS=4
       - WORKER_BITS=2
-      - SEQUENCE_BITS=7
+      - SEQUENCE_BITS=10
 
       # Application
       - BASE_DOMAIN=localhost:8002
@@ -91,7 +91,7 @@ services:
       - CACHE_TTL_SECONDS=3600
 
       # Logging
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=DEBUG
     ports:
       - "8001:8001"
     depends_on:
@@ -143,7 +143,7 @@ services:
       - CACHE_TTL_SECONDS=3600
 
       # Logging
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=DEBUG
     ports:
       - "8002:8002"
     depends_on:
@@ -176,7 +176,7 @@ services:
       - REDIS_ENABLED=true
       - QUEUE_ENABLED=true
       - BATCH_SIZE=100
-      - BATCH_INTERVAL_SECONDS=10
+      - BATCH_INTERVAL_SECONDS=100
       - ENABLE_BACKGROUND_SCHEDULER=true
 
       # Redis Connection Pooling
@@ -193,7 +193,7 @@ services:
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500
 
       # Logging
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=DEBUG
     ports:
       - "8003:8003"
     depends_on:

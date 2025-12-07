@@ -10,7 +10,7 @@ TEST_EPOCH_SEC = int(time.time()) - (60 * 60)  # 1 hour ago
 
 
 class TestSnowflakeIDGenerator:
-    """Test suite for 7-char Snowflake ID generator (41-bit strategy, SECOND precision)"""
+    """Test suite for 8-char Snowflake ID generator (47-bit strategy, SECOND precision)"""
 
     # ========== Initialization Tests ==========
 
@@ -51,26 +51,26 @@ class TestSnowflakeIDGenerator:
             SnowflakeIDGenerator(datacenter_id=0, worker_id=-1)
 
     def test_bit_allocation(self):
-        """Test correct bit allocation for 41-bit strategy"""
+        """Test correct bit allocation for 47-bit strategy"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
 
         # Verify bit sizes
-        assert generator.timestamp_bits == 28
+        assert generator.timestamp_bits == 31
         assert generator.datacenter_bits == 4
         assert generator.worker_bits == 2
-        assert generator.sequence_bits == 7
+        assert generator.sequence_bits == 10
 
-        # Verify total is 41 bits
+        # Verify total is 47 bits
         total_bits = (generator.timestamp_bits + generator.datacenter_bits +
                      generator.worker_bits + generator.sequence_bits)
-        assert total_bits == 41
+        assert total_bits == 47
 
     def test_max_values(self):
         """Test maximum values for each component"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
 
-        # 28 bits timestamp: 2^28 - 1 = 268,435,455 seconds (~8.51 years)
-        assert generator.max_timestamp == 268_435_455
+        # 31 bits timestamp: 2^31 - 1 = 2,147,483,647 seconds (~68 years)
+        assert generator.max_timestamp == 2_147_483_647
 
         # 4 bits datacenter: 2^4 - 1 = 15
         assert generator.max_datacenter_id == 15
@@ -78,8 +78,8 @@ class TestSnowflakeIDGenerator:
         # 2 bits worker: 2^2 - 1 = 3
         assert generator.max_worker_id == 3
 
-        # 7 bits sequence: 2^7 - 1 = 127
-        assert generator.max_sequence == 127
+        # 10 bits sequence: 2^10 - 1 = 1023
+        assert generator.max_sequence == 1023
 
     # ========== ID Generation Tests ==========
 
@@ -91,8 +91,8 @@ class TestSnowflakeIDGenerator:
 
         assert isinstance(id_value, int)
         assert id_value > 0
-        # 41 bits max value: 2^41 - 1
-        assert id_value < (1 << 41)
+        # 47 bits max value: 2^47 - 1
+        assert id_value < (1 << 47)
 
     @pytest.mark.asyncio
     async def test_generate_multiple_unique_ids(self):
@@ -129,7 +129,7 @@ class TestSnowflakeIDGenerator:
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
 
         # Set sequence to max - 1
-        generator.sequence = 126
+        generator.sequence = 1022
         generator.last_timestamp = generator._current_timestamp_sec()
 
         # Generate two more IDs (should trigger overflow and wait)
@@ -139,8 +139,8 @@ class TestSnowflakeIDGenerator:
         components1 = generator.extract_components(id1)
         components2 = generator.extract_components(id2)
 
-        # Sequence should have wrapped after hitting max (127)
-        assert components1['sequence'] == 127
+        # Sequence should have wrapped after hitting max (1023)
+        assert components1['sequence'] == 1023
         assert components2['sequence'] == 0
 
     @pytest.mark.asyncio
@@ -187,37 +187,37 @@ class TestSnowflakeIDGenerator:
         """Test encoding zero"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
         code = generator.encode_base62(0)
-        assert code == "0000000"
-        assert len(code) == 7
+        assert code == "00000000"
+        assert len(code) == 8
 
     def test_encode_base62_small_number(self):
         """Test encoding small number"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
         code = generator.encode_base62(123)
-        # 123 in base62 is 1z (using lowercase), padded to 7
-        assert code == "000001z"
-        assert len(code) == 7
+        # 123 in base62 is 1z (using lowercase), padded to 8
+        assert code == "0000001z"
+        assert len(code) == 8
 
     def test_encode_base62_large_number(self):
         """Test encoding large number (near 41-bit max)"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
         # Max 41-bit value: 2^41 - 1 = 2,199,023,255,551
-        max_41_bit = (1 << 41) - 1
-        code = generator.encode_base62(max_41_bit)
-        assert len(code) == 7
+        max_47_bit = (1 << 47) - 1
+        code = generator.encode_base62(max_47_bit)
+        assert len(code) == 8
 
-    def test_encode_base62_7_chars(self):
-        """Test that all IDs encode to exactly 7 characters"""
+    def test_encode_base62_8_chars(self):
+        """Test that all IDs encode to exactly 8 characters"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
 
         test_values = [
             1, 100, 1000, 10000, 100000, 1000000,
-            (1 << 20), (1 << 30), (1 << 40)
+            (1 << 20), (1 << 30), (1 << 40), (1 << 46)
         ]
 
         for val in test_values:
             code = generator.encode_base62(val)
-            assert len(code) == 7, f"Value {val} encoded to {len(code)} chars: {code}"
+            assert len(code) == 8, f"Value {val} encoded to {len(code)} chars: {code}"
 
     def test_decode_base62(self):
         """Test decoding base62 strings"""
@@ -247,12 +247,12 @@ class TestSnowflakeIDGenerator:
 
     @pytest.mark.asyncio
     async def test_generate_short_code(self):
-        """Test generating 7-character short codes"""
+        """Test generating 8-character short codes"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
         code = await generator.generate_short_code()
 
         assert isinstance(code, str)
-        assert len(code) == 7
+        assert len(code) == 8
         # Should only contain base62 characters
         assert all(c in generator.BASE62_ALPHABET for c in code)
 
@@ -293,35 +293,35 @@ class TestSnowflakeIDGenerator:
 
                 assert components['datacenter_id'] == dc_id
                 assert components['worker_id'] == worker_id
-                assert 0 <= components['sequence'] <= 127
+                assert 0 <= components['sequence'] <= 1023
 
     # ========== Capacity Tests ==========
 
     @pytest.mark.asyncio
-    async def test_capacity_128_ids_per_second_per_worker(self):
-        """Test each worker can generate 128 IDs per second"""
+    async def test_capacity_1024_ids_per_second_per_worker(self):
+        """Test each worker can generate 1024 IDs per second"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
 
         # Generate first ID to set the timestamp
         first_id = await generator.generate_id()
 
-        # Generate 127 more IDs rapidly (should stay in same second)
+        # Generate 1023 more IDs rapidly (should stay in same second)
         ids = [first_id]
-        for _ in range(1, 128):
+        for _ in range(1, 1024):
             id_value = await generator.generate_id()
             ids.append(id_value)
 
         # All IDs should be unique
         assert len(ids) == len(set(ids))
 
-        # Check that we can generate at least 128 IDs
+        # Check that we can generate at least 1024 IDs
         # (Some may spill to next second, which is fine)
-        assert len(ids) == 128
+        assert len(ids) == 1024
 
     @pytest.mark.asyncio
-    async def test_total_capacity_8192_ids_per_sec(self):
-        """Test total system capacity: 8,192 IDs/sec across all DCs"""
-        # 16 DCs × 4 workers × 128 sequences = 8,192 IDs/sec
+    async def test_total_capacity_65536_ids_per_sec(self):
+        """Test total system capacity: 65,536 IDs/sec across all DCs"""
+        # 16 DCs × 4 workers × 1024 sequences = 65,536 IDs/sec
 
         generators = []
         for dc in range(16):
@@ -330,33 +330,33 @@ class TestSnowflakeIDGenerator:
 
         assert len(generators) == 64  # 16 DCs × 4 workers
 
-        # Each can do 128 IDs/sec
-        total_capacity = 64 * 128
-        assert total_capacity == 8192
+        # Each can do 1024 IDs/sec
+        total_capacity = 64 * 1024
+        assert total_capacity == 65536
 
     # ========== Timestamp Tests ==========
 
-    def test_timestamp_range_8_5_years(self):
-        """Test timestamp supports ~8.51 years"""
+    def test_timestamp_range_68_years(self):
+        """Test timestamp supports ~68 years"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
 
-        # 28 bits: 2^28 - 1 = 268,435,455 seconds
+        # 31 bits: 2^31 - 1 = 2,147,483,647 seconds
         max_sec = generator.max_timestamp
-        assert max_sec == 268_435_455
+        assert max_sec == 2_147_483_647
 
         # Convert seconds to years
         seconds_per_year = 365.25 * 24 * 60 * 60
         years = max_sec / seconds_per_year
 
-        assert 8.4 < years < 8.6  # Approximately 8.51 years
+        assert 68.0 < years < 68.2  # Approximately 68.05 years
 
     @pytest.mark.asyncio
     async def test_timestamp_overflow_error(self):
-        """Test error when timestamp exceeds 28 bits"""
+        """Test error when timestamp exceeds 31 bits"""
         # Use an epoch far enough in the past to trigger overflow
-        # 28 bits in seconds = 268,435,455 seconds (~8.51 years)
-        # Set epoch to 9 years ago to trigger overflow
-        overflow_epoch = int(time.time()) - (9 * 365 * 24 * 60 * 60)
+        # 31 bits in seconds = 2,147,483,647 seconds (~68 years)
+        # Set epoch to 69 years ago to trigger overflow
+        overflow_epoch = int(time.time()) - (69 * 365 * 24 * 60 * 60)
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=overflow_epoch)
 
         # Should raise error because current time exceeds max timestamp
@@ -422,8 +422,8 @@ class TestSnowflakeIDGenerator:
         assert len(all_ids) == len(set(all_ids))  # 240 unique IDs
         assert len(all_codes) == len(set(all_codes))  # 240 unique codes
 
-        # Verify all codes are 7 characters
-        assert all(len(code) == 7 for code in all_codes)
+        # Verify all codes are 8 characters
+        assert all(len(code) == 8 for code in all_codes)
 
     @pytest.mark.asyncio
     async def test_realistic_url_shortener_scenario(self):
@@ -444,7 +444,7 @@ class TestSnowflakeIDGenerator:
             url_mappings[short_code] = fake_url
 
             # Verify code format
-            assert len(short_code) == 7
+            assert len(short_code) == 8
             assert all(c in generator.BASE62_ALPHABET for c in short_code)
 
         assert len(url_mappings) == 1000

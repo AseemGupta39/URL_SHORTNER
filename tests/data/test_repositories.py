@@ -246,16 +246,16 @@ class TestSQLiteURLRepositoryEdgeCases:
         assert retrieved.original_url == long_url
 
     @pytest.mark.asyncio
-    async def test_create_with_7_char_code(self, repository):
-        """Test creating a URL with 7-character code (max length)."""
+    async def test_create_with_8_char_code(self, repository):
+        """Test creating a URL with 8-character code (max length)."""
         url_data = URLData(
-            short_code="abcdefg",
-            original_url="https://example.com/seven",
+            short_code="abcdefgh",
+            original_url="https://example.com/eight",
             created_at=datetime.now()
         )
 
         result = await repository.create(url_data)
-        assert result.short_code == "abcdefg"
+        assert result.short_code == "abcdefgh"
 
     @pytest.mark.asyncio
     async def test_create_with_special_chars_in_url(self, repository):

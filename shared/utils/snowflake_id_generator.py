@@ -6,14 +6,14 @@ from shared.utils.interfaces.id_generator import IDGenerator
 
 class SnowflakeIDGenerator(IDGenerator):
     """
-    7-char Snowflake ID generator using 41-bit strategy with SECOND precision:
-    - 28 bits: timestamp in SECONDS (8.51 years from epoch)
+    8-char Snowflake ID generator using adjusted bit allocation with SECOND precision:
+    - 31 bits: timestamp in SECONDS (~50 years from epoch)
     - 4 bits: datacenter_id (16 data centers, 0-15)
     - 2 bits: worker_id (4 workers per DC, 0-3)
-    - 7 bits: sequence (128 IDs/second/worker, 0-127)
+    - 10 bits: sequence (1024 IDs/second/worker, 0-1023)
 
-    Total capacity: 8,192 IDs/second across all DCs
-    Base62 encoding produces 7-character codes
+    Total capacity: 16 DCs × 4 workers × 1024 = 65,536 IDs/second
+    Base62 encoding produces 8-character codes
     """
 
     # Base62 alphabet
@@ -25,10 +25,10 @@ class SnowflakeIDGenerator(IDGenerator):
         datacenter_id: int,
         worker_id: int,
         epoch_sec: int = 1704067200,
-        timestamp_bits: int = 28,
+        timestamp_bits: int = 31,
         datacenter_bits: int = 4,
         worker_bits: int = 2,
-        sequence_bits: int = 7
+        sequence_bits: int = 10
     ):
         """
         Initialize Snowflake ID generator
@@ -37,10 +37,10 @@ class SnowflakeIDGenerator(IDGenerator):
             datacenter_id: Data center ID (0-15)
             worker_id: Worker ID (0-3)
             epoch_sec: Custom epoch in seconds (default: 2024-01-01 00:00:00 UTC = 1704067200)
-            timestamp_bits: Bits for timestamp (default: 28 for 8.51 years)
+            timestamp_bits: Bits for timestamp (default: 31 for around 50 years)
             datacenter_bits: Bits for datacenter ID (default: 4)
             worker_bits: Bits for worker ID (default: 2)
-            sequence_bits: Bits for sequence (default: 7)
+            sequence_bits: Bits for sequence (default: 10)
 
         Raises:
             ValueError: If datacenter_id or worker_id out of range
@@ -51,16 +51,16 @@ class SnowflakeIDGenerator(IDGenerator):
         self.worker_bits = worker_bits
         self.sequence_bits = sequence_bits
 
-        # Bit shifts
-        self.timestamp_shift = datacenter_bits + worker_bits + sequence_bits
-        self.datacenter_shift = worker_bits + sequence_bits
-        self.worker_shift = sequence_bits
+        # Bit shifts (use instance values to avoid mismatch)
+        self.timestamp_shift = self.datacenter_bits + self.worker_bits + self.sequence_bits
+        self.datacenter_shift = self.worker_bits + self.sequence_bits
+        self.worker_shift = self.sequence_bits
 
-        # Max values
-        self.max_datacenter_id = (1 << datacenter_bits) - 1
-        self.max_worker_id = (1 << worker_bits) - 1
-        self.max_sequence = (1 << sequence_bits) - 1
-        self.max_timestamp = (1 << timestamp_bits) - 1
+        # Max values (derived from instance bit sizes)
+        self.max_datacenter_id = (1 << self.datacenter_bits) - 1
+        self.max_worker_id = (1 << self.worker_bits) - 1
+        self.max_sequence = (1 << self.sequence_bits) - 1
+        self.max_timestamp = (1 << self.timestamp_bits) - 1
 
         if datacenter_id < 0 or datacenter_id > self.max_datacenter_id:
             raise ValueError(f"datacenter_id must be 0-{self.max_datacenter_id}")
@@ -89,10 +89,10 @@ class SnowflakeIDGenerator(IDGenerator):
 
     async def generate_id(self) -> int:
         """
-        Generate unique 41-bit ID
+        Generate unique ID (bits determined by configured bit fields)
 
         Returns:
-            int: Unique ID that encodes to 7 base62 characters
+            int: Unique integer ID that encodes to an 8-character base62 string
 
         Raises:
             RuntimeError: If clock moves backwards or timestamp exceeds max
@@ -135,7 +135,7 @@ class SnowflakeIDGenerator(IDGenerator):
                     f"Current timestamp {timestamp} is before epoch {self.epoch_sec}"
                 )
 
-            # Compose 41-bit ID
+            # Compose integer ID from components (timestamp/datacenter/worker/sequence)
             id_value = (
                 (relative_timestamp << self.timestamp_shift) |
                 (self.datacenter_id << self.datacenter_shift) |
@@ -153,19 +153,19 @@ class SnowflakeIDGenerator(IDGenerator):
             num: Number to encode
 
         Returns:
-            str: Base62 encoded string (7 characters for 41-bit IDs)
+            str: Base62 encoded string (8 characters for 47-bit IDs)
         """
         if num == 0:
-            return self.BASE62_ALPHABET[0].zfill(7)
+            return self.BASE62_ALPHABET[0].zfill(8)
 
         result = []
         while num > 0:
             result.append(self.BASE62_ALPHABET[num % 62])
             num //= 62
 
-        # Pad to 7 characters
+        # Pad to 8 characters
         code = ''.join(reversed(result))
-        return code.zfill(7)
+        return code.zfill(8)
 
     def decode_base62(self, code: str) -> int:
         """
@@ -206,10 +206,10 @@ class SnowflakeIDGenerator(IDGenerator):
 
     async def generate_short_code(self) -> str:
         """
-        Generate 7-character short code
+        Generate 8-character short code
 
         Returns:
-            str: 7-character base62 short code
+            str: 8-character base62 short code
         """
         id_value = await self.generate_id()
         return self.encode_base62(id_value)
