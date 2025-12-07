@@ -59,6 +59,11 @@ services:
       - REDIS_ENABLED=true
       - QUEUE_ENABLED=true
 
+      # Redis Connection Pooling
+      - REDIS_POOL_MAX_CONNECTIONS=100
+      - REDIS_SOCKET_TIMEOUT=5
+      - REDIS_SOCKET_CONNECT_TIMEOUT=5
+
       # ID Generator
       - DATACENTER_ID=0
       - WORKER_ID=0
@@ -119,6 +124,11 @@ services:
       - REDIS_ENABLED=true
       - QUEUE_ENABLED=true
 
+      # Redis Connection Pooling
+      - REDIS_POOL_MAX_CONNECTIONS=100
+      - REDIS_SOCKET_TIMEOUT=5
+      - REDIS_SOCKET_CONNECT_TIMEOUT=5
+
       # Server
       - HOST=0.0.0.0
       - PORT=8002
@@ -168,6 +178,11 @@ services:
       - BATCH_SIZE=100
       - BATCH_INTERVAL_SECONDS=10
       - ENABLE_BACKGROUND_SCHEDULER=true
+
+      # Redis Connection Pooling
+      - REDIS_POOL_MAX_CONNECTIONS=100
+      - REDIS_SOCKET_TIMEOUT=5
+      - REDIS_SOCKET_CONNECT_TIMEOUT=5
 
       # Server
       - HOST=0.0.0.0
