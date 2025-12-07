@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     redis_url: str = ""  # Redis connection URL (e.g., redis://localhost:6379 or Upstash URL)
     redis_enabled: bool = False  # Enable Redis cache and queue
 
+    # Redis Connection Pooling (like PgBouncer for PostgreSQL)
+    # Each service gets its own connection pool (singleton pattern in dependencies.py)
+    # Pool size should match expected concurrent requests per service
+    redis_pool_max_connections: int = 50  # Max connections in pool (tune based on load)
+    redis_socket_timeout: int = 5  # Socket operation timeout in seconds
+    redis_socket_connect_timeout: int = 5  # Connection timeout in seconds
+
     # Queue Configuration
     queue_enabled: bool = False  # Enable async batch processing
     batch_size: int = 100  # Number of URLs to batch insert at once

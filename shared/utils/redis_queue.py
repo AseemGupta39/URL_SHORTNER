@@ -11,27 +11,55 @@ logger = get_logger()
 
 
 class RedisQueue(Queue):
-    """Redis-based queue for batching URL insertions."""
+    """
+    Redis-based queue for batching URL insertions.
 
-    def __init__(self, redis_url: str, queue_name: str = "url_batch_queue"):
+    Connection Pooling:
+    - Uses built-in redis-py connection pooling (like PgBouncer for PostgreSQL)
+    - Connections are reused across requests for better performance
+    - Pool size should match expected concurrent requests
+    """
+
+    def __init__(
+        self,
+        redis_url: str,
+        queue_name: str = "url_batch_queue",
+        max_connections: int = 50,
+        socket_timeout: int = 5,
+        socket_connect_timeout: int = 5
+    ):
         self.redis_url = redis_url
         self.queue_name = queue_name
+        self.max_connections = max_connections
+        self.socket_timeout = socket_timeout
+        self.socket_connect_timeout = socket_connect_timeout
         self._client: Optional[aioredis.Redis] = None
 
-        logger.info(f"RedisQueue initialized (queue={queue_name})")
+        logger.info(
+            f"RedisQueue initialized (queue={queue_name}, pool_size={max_connections})"
+        )
 
     async def connect(self):
-        """Establish Redis connection."""
+        """
+        Establish Redis connection with connection pooling.
+
+        Creates a connection pool that reuses connections (like PgBouncer).
+        """
         if self._client is None:
             try:
                 self._client = await aioredis.from_url(
                     self.redis_url,
                     encoding="utf-8",
                     decode_responses=True,
-                    max_connections=10
+                    max_connections=self.max_connections,
+                    socket_timeout=self.socket_timeout,
+                    socket_connect_timeout=self.socket_connect_timeout
                 )
                 await self._client.ping()
-                logger.info("RedisQueue connected")
+                logger.info(
+                    f"RedisQueue connected (pool_size={self.max_connections}, "
+                    f"timeout={self.socket_timeout}s)"
+                )
             except Exception as e:
                 logger.error(f"RedisQueue connection failed: {e}")
                 raise

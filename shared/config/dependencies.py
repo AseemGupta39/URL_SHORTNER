@@ -56,7 +56,12 @@ _cache_instance: Cache | None = None
 
 async def get_cache() -> Cache:
     """
-    Get the global cache instance.
+    Get the global cache instance (singleton with connection pooling).
+
+    Redis Connection Pooling:
+    - Like PgBouncer for PostgreSQL, redis-py provides built-in connection pooling
+    - Connections are reused across requests for better performance
+    - Pool size configured via settings.redis_pool_max_connections
 
     Returns:
         RedisCache if Redis is enabled, otherwise LRUCache
@@ -65,10 +70,13 @@ async def get_cache() -> Cache:
 
     if _cache_instance is None:
         if settings.redis_enabled and settings.redis_url:
-            logger.info("Initializing RedisCache")
+            logger.info("Initializing RedisCache with connection pooling")
             _cache_instance = RedisCache(
                 redis_url=settings.redis_url,
-                ttl_seconds=settings.cache_ttl_seconds
+                ttl_seconds=settings.cache_ttl_seconds,
+                max_connections=settings.redis_pool_max_connections,
+                socket_timeout=settings.redis_socket_timeout,
+                socket_connect_timeout=settings.redis_socket_connect_timeout
             )
             await _cache_instance.connect()
         else:
@@ -87,7 +95,12 @@ _queue_instance: Queue | None = None
 
 async def get_queue() -> Queue:
     """
-    Get the global queue instance.
+    Get the global queue instance (singleton with connection pooling).
+
+    Redis Connection Pooling:
+    - Like PgBouncer for PostgreSQL, redis-py provides built-in connection pooling
+    - Connections are reused across requests for better performance
+    - Pool size configured via settings.redis_pool_max_connections
 
     Returns:
         RedisQueue for batch processing
@@ -96,8 +109,13 @@ async def get_queue() -> Queue:
 
     if _queue_instance is None:
         if settings.queue_enabled and settings.redis_url:
-            logger.info("Initializing RedisQueue")
-            _queue_instance = RedisQueue(redis_url=settings.redis_url)
+            logger.info("Initializing RedisQueue with connection pooling")
+            _queue_instance = RedisQueue(
+                redis_url=settings.redis_url,
+                max_connections=settings.redis_pool_max_connections,
+                socket_timeout=settings.redis_socket_timeout,
+                socket_connect_timeout=settings.redis_socket_connect_timeout
+            )
             await _queue_instance.connect()
         else:
             raise RuntimeError("Queue is required but not enabled in settings")
