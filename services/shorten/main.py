@@ -16,7 +16,7 @@ load_dotenv(env_file, override=True)
 project_root = service_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
@@ -24,6 +24,8 @@ import logging
 from shared.config.settings import settings
 from shared.utils.logger import AppLogger, get_logger
 from shared.middleware.request_id import RequestIDMiddleware
+from shared.config.dependencies import get_url_repository, get_cache
+from shared.utils.health import check_database, check_redis, check_all_dependencies
 from services.shorten.controllers import url_router
 
 # Setup application logger
@@ -54,17 +56,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check endpoint (kept in main.py - see ARCHITECTURE.md for reasoning)
+# Health check endpoints (kept in main.py - see ARCHITECTURE.md for reasoning)
 # IMPORTANT: Must be defined BEFORE including url_router to ensure proper route precedence
 @app.get("/health")
 async def health_check():
-    """Health check for load balancer."""
+    """
+    Basic health check for load balancer.
+    Returns simple status without checking dependencies.
+    """
     return {
         "service": "shorten",
         "status": "healthy",
         "datacenter_id": settings.datacenter_id,
         "worker_id": settings.worker_id
     }
+
+
+@app.get("/health/full")
+async def full_health_check(
+    repository=Depends(get_url_repository),
+    cache=Depends(get_cache)
+):
+    """
+    Comprehensive health check including all dependencies.
+    Checks database and Redis connectivity.
+    """
+    result = await check_all_dependencies(
+        service_name="shorten",
+        repository=repository,
+        cache=cache
+    )
+    return result
+
+
+@app.get("/health/db")
+async def database_health_check(repository=Depends(get_url_repository)):
+    """Check database connectivity and performance."""
+    result = await check_database(repository)
+    return result
+
+
+@app.get("/health/redis")
+async def redis_health_check(cache=Depends(get_cache)):
+    """Check Redis connectivity and performance."""
+    result = await check_redis(cache)
+    return result
 
 # Include API routers
 app.include_router(url_router)
