@@ -2,6 +2,9 @@ import time
 import asyncio
 
 from shared.utils.interfaces.id_generator import IDGenerator
+from shared.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class SnowflakeIDGenerator(IDGenerator):
@@ -76,6 +79,17 @@ class SnowflakeIDGenerator(IDGenerator):
         self.last_timestamp = -1
         self._lock = asyncio.Lock()
 
+        # Log initialization details
+        logger.info(
+            f"SnowflakeIDGenerator initialized: DC={datacenter_id}, W={worker_id}, "
+            f"epoch={epoch_sec}, bits=[ts:{timestamp_bits}, dc:{datacenter_bits}, "
+            f"w:{worker_bits}, seq:{sequence_bits}]"
+        )
+        logger.info(
+            f"Max values: DC={self.max_datacenter_id}, W={self.max_worker_id}, "
+            f"seq={self.max_sequence}, timestamp={self.max_timestamp}"
+        )
+
     def _current_timestamp_sec(self) -> int:
         """Get current timestamp in seconds"""
         return int(time.time())
@@ -102,6 +116,10 @@ class SnowflakeIDGenerator(IDGenerator):
 
             # Clock moved backwards
             if timestamp < self.last_timestamp:
+                logger.error(
+                    f"Clock moved backwards! Last={self.last_timestamp}, Current={timestamp}, "
+                    f"Diff={self.last_timestamp - timestamp}s"
+                )
                 raise RuntimeError(
                     f"Clock moved backwards. Refusing to generate ID. "
                     f"Last: {self.last_timestamp}, Current: {timestamp}"
@@ -113,6 +131,9 @@ class SnowflakeIDGenerator(IDGenerator):
 
                 # Sequence exhausted - wait for next second
                 if self.sequence == 0:
+                    logger.warning(
+                        f"Sequence exhausted ({self.max_sequence + 1} IDs/sec), waiting for next second"
+                    )
                     timestamp = self._wait_next_second(self.last_timestamp)
             else:
                 # New second - reset sequence
@@ -125,12 +146,18 @@ class SnowflakeIDGenerator(IDGenerator):
 
             # Check timestamp overflow
             if relative_timestamp > self.max_timestamp:
+                logger.error(
+                    f"Timestamp overflow! Relative={relative_timestamp}, Max={self.max_timestamp}"
+                )
                 raise RuntimeError(
                     f"Timestamp overflow. Relative timestamp {relative_timestamp} "
                     f"exceeds max {self.max_timestamp}"
                 )
 
             if relative_timestamp < 0:
+                logger.error(
+                    f"Timestamp before epoch! Current={timestamp}, Epoch={self.epoch_sec}"
+                )
                 raise RuntimeError(
                     f"Current timestamp {timestamp} is before epoch {self.epoch_sec}"
                 )
@@ -141,6 +168,12 @@ class SnowflakeIDGenerator(IDGenerator):
                 (self.datacenter_id << self.datacenter_shift) |
                 (self.worker_id << self.worker_shift) |
                 self.sequence
+            )
+
+            # Log every ID generation in DEBUG mode (comprehensive logging as requested)
+            logger.debug(
+                f"Generated ID: {id_value} [ts={relative_timestamp}, dc={self.datacenter_id}, "
+                f"w={self.worker_id}, seq={self.sequence}]"
             )
 
             return id_value
@@ -212,4 +245,6 @@ class SnowflakeIDGenerator(IDGenerator):
             str: 8-character base62 short code
         """
         id_value = await self.generate_id()
-        return self.encode_base62(id_value)
+        short_code = self.encode_base62(id_value)
+        logger.debug(f"Generated short code: {short_code} (ID={id_value})")
+        return short_code

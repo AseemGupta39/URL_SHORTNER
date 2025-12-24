@@ -10,6 +10,9 @@ from collections import OrderedDict
 import threading
 
 from shared.utils.interfaces.cache import Cache, CacheEntry
+from shared.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class LRUCache(Cache):
@@ -64,6 +67,9 @@ class LRUCache(Cache):
         self._misses = 0    # How many times item wasn't in cache
         self._evictions = 0 # How many times we removed old items
 
+        # Log initialization
+        logger.info(f"LRUCache initialized (max_size={max_size}, ttl={ttl_seconds}s)")
+
     async def get_async(self, key: str) -> Optional[Any]:
         """
         Get a value from the cache.
@@ -80,15 +86,18 @@ class LRUCache(Cache):
 
             if entry is None:
                 self._misses += 1
+                logger.debug(f"LRU cache miss: {key} (not found)")
                 return None
 
             if entry.is_expired():
                 self._cache.pop(key)
                 self._misses += 1
+                logger.debug(f"LRU cache miss: {key} (expired)")
                 return None
 
             self._cache.move_to_end(key)
             self._hits += 1
+            logger.debug(f"LRU cache hit: {key}")
             return entry.value
 
     async def set_async(self, key: str, value: Any) -> bool:
@@ -109,12 +118,18 @@ class LRUCache(Cache):
             if key in self._cache:
                 self._cache[key] = entry
                 self._cache.move_to_end(key)
+                logger.debug(f"LRU cache updated: {key}")
             else:
                 self._cache[key] = entry
+                logger.debug(f"LRU cache set: {key}")
 
                 if len(self._cache) > self.max_size:
-                    self._cache.popitem(last=False)
+                    evicted_key, _ = self._cache.popitem(last=False)
                     self._evictions += 1
+                    logger.warning(
+                        f"LRU cache eviction: removed {evicted_key} "
+                        f"(size={len(self._cache)}/{self.max_size}, evictions={self._evictions})"
+                    )
 
             return True
 
@@ -131,7 +146,9 @@ class LRUCache(Cache):
         with self._lock:
             if key in self._cache:
                 self._cache.pop(key)
+                logger.debug(f"LRU cache delete: {key}")
                 return True
+            logger.debug(f"LRU cache delete failed: {key} (not found)")
             return False
 
     def clear(self) -> None:
@@ -195,5 +212,11 @@ class LRUCache(Cache):
             # Remove them
             for key in expired_keys:
                 self._cache.pop(key)
+
+            if expired_keys:
+                logger.info(
+                    f"LRU cache cleanup: removed {len(expired_keys)} expired entries "
+                    f"(size={len(self._cache)}/{self.max_size})"
+                )
 
             return len(expired_keys)
