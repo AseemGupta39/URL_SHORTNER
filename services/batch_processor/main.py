@@ -15,9 +15,9 @@ load_dotenv(env_file, override=True)
 project_root = service_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 
-from shared.config.settings import get_settings
+from services.batch_processor.config import get_settings  # Service-specific settings
 from shared.config.dependencies import get_url_repository, get_cache
 from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
@@ -53,14 +53,23 @@ async def health_check():
 
 
 @app.get("/health/full")
-async def full_health_check(
-    repository=Depends(get_url_repository),
-    cache=Depends(get_cache)
-):
+async def full_health_check():
     """
     Comprehensive health check including all dependencies.
     Checks database and Redis connectivity.
     """
+    try:
+        repository = await get_url_repository()
+    except Exception as e:
+        repository = None
+        logger.error(f"Failed to get repository for health check: {e}")
+
+    try:
+        cache = await get_cache()
+    except Exception as e:
+        cache = None
+        logger.error(f"Failed to get cache for health check: {e}")
+
     result = await check_all_dependencies(
         service_name="batch_processor",
         repository=repository,
@@ -70,16 +79,36 @@ async def full_health_check(
 
 
 @app.get("/health/db")
-async def database_health_check(repository=Depends(get_url_repository)):
+async def database_health_check():
     """Check database connectivity and performance."""
-    result = await check_database(repository)
+    try:
+        repository = await get_url_repository()
+        result = await check_database(repository)
+    except Exception as e:
+        logger.error(f"Failed to get repository for health check: {e}")
+        from shared.utils.health import DependencyHealth
+        result = DependencyHealth(
+            status="unhealthy",
+            message="Failed to initialize database connection",
+            error=str(e)
+        )
     return result
 
 
 @app.get("/health/redis")
-async def redis_health_check(cache=Depends(get_cache)):
+async def redis_health_check():
     """Check Redis connectivity and performance."""
-    result = await check_redis(cache)
+    try:
+        cache = await get_cache()
+        result = await check_redis(cache)
+    except Exception as e:
+        logger.error(f"Failed to get cache for health check: {e}")
+        from shared.utils.health import DependencyHealth
+        result = DependencyHealth(
+            status="unhealthy",
+            message="Failed to initialize Redis connection",
+            error=str(e)
+        )
     return result
 
 # Include API routers
