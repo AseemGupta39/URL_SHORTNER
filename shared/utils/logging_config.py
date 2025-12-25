@@ -18,6 +18,36 @@ except ImportError:
     HAS_COLORLOG = False
 
 
+# Store original LogRecord factory
+_original_log_record_factory = logging.getLogRecordFactory()
+
+
+def _context_aware_log_record(*args, **kwargs):
+    """
+    Custom LogRecord factory that automatically adds context variables to log records.
+
+    This makes context data (like request_id, user_id, etc.) available in all log messages
+    without needing to pass them manually or use filters.
+
+    Extensible: Just add more context getters here as needed.
+    """
+    record = _original_log_record_factory(*args, **kwargs)
+
+    # Add request ID from context
+    try:
+        from shared.utils.request_context import get_request_id
+        request_id = get_request_id()
+        record.request_id = request_id if request_id else "-"
+    except (ImportError, Exception):
+        record.request_id = "-"
+
+    # Future: Add more context variables here as needed
+    # record.user_id = get_user_id() or "-"
+    # record.session_id = get_session_id() or "-"
+
+    return record
+
+
 def setup_logging(
     service_name: str,
     log_level: str = "INFO",
@@ -51,6 +81,9 @@ def setup_logging(
         >>> logger = logging.getLogger(__name__)
         >>> logger.info("Service started")
     """
+    # Install custom LogRecord factory to add context variables
+    logging.setLogRecordFactory(_context_aware_log_record)
+
     # Get root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
@@ -62,8 +95,8 @@ def setup_logging(
     if json_format:
         log_format = _get_json_format()
     else:
-        # Standard format: timestamp [level] [module:line:function] message
-        log_format = "%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d:%(funcName)s] %(message)s"
+        # Standard format: timestamp [level] [request_id] [module:line:function] message
+        log_format = "%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(lineno)d:%(funcName)s] %(message)s"
         date_format = "%Y-%m-%d %H:%M:%S"
 
     # Console handler with colors
@@ -72,9 +105,9 @@ def setup_logging(
         console_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
         if HAS_COLORLOG and not json_format:
-            # Colored console formatter
+            # Colored console formatter (includes request_id from context)
             console_formatter = colorlog.ColoredFormatter(
-                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d:%(funcName)s]%(reset)s %(message)s",
+                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(lineno)d:%(funcName)s]%(reset)s %(message)s",
                 datefmt=date_format,
                 log_colors={
                     "DEBUG": "cyan",
