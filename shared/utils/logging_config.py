@@ -2,7 +2,7 @@
 Per-service logging configuration module.
 
 Provides setup_logging() function to configure logging for each microservice
-with colored output, log rotation, and date-based directory organization.
+with colored console output, clean file logs, log rotation, and date-based directory organization.
 """
 
 import logging
@@ -119,24 +119,9 @@ def setup_logging(
         )
         file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
-        if HAS_COLORLOG and not json_format:
-            # Colored file formatter (ANSI codes in file)
-            file_formatter = colorlog.ColoredFormatter(
-                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d:%(funcName)s]%(reset)s %(message)s",
-                datefmt=date_format,
-                log_colors={
-                    "DEBUG": "cyan",
-                    "INFO": "green",
-                    "WARNING": "yellow",
-                    "ERROR": "red",
-                    "CRITICAL": "red,bg_white",
-                },
-            )
-            file_handler.setFormatter(file_formatter)
-        else:
-            # Standard formatter for files
-            file_formatter = logging.Formatter(log_format, datefmt=date_format)
-            file_handler.setFormatter(file_formatter)
+        # Use standard formatter for file logs (no colors - clean text)
+        file_formatter = logging.Formatter(log_format, datefmt=date_format)
+        file_handler.setFormatter(file_formatter)
 
         root_logger.addHandler(file_handler)
 
