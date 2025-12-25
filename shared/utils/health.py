@@ -5,13 +5,13 @@ Provides structured health check responses using Pydantic models.
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
+import logging
 
-from shared.utils.logger import get_logger
 from shared.data.repositories.sqlite_url_repository import SQLiteURLRepository
 from shared.utils.interfaces.cache import Cache
 from shared.utils.redis_cache import RedisCache
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 class DependencyHealth(BaseModel):

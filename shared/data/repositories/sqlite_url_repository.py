@@ -2,6 +2,7 @@
 SQLite/PostgreSQL repository implementation for URL storage using SQLAlchemy ORM.
 """
 from typing import Optional, List
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -9,9 +10,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from shared.data.interfaces.url_repository import URLRepository
 from shared.data.models import URLModel, Base
 from shared.core.schemas import URLData
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 class SQLiteURLRepository(URLRepository):

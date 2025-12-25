@@ -4,12 +4,13 @@ URL Shortening Controller
 Handles HTTP routes for URL shortening operations.
 """
 from fastapi import APIRouter, Depends
+import logging
+
 from shared.core.schemas import ShortenRequest, ShortenResponse
 from shared.core.services import URLService
 from shared.config.dependencies import get_url_service
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 

@@ -2,6 +2,7 @@
 Dependency injection factories for FastAPI.
 """
 from fastapi import Depends
+import logging
 
 from shared.config.settings import settings
 from shared.utils.interfaces.id_generator import IDGenerator
@@ -13,9 +14,8 @@ from shared.utils.lru_cache import LRUCache
 from shared.utils.redis_cache import RedisCache
 from shared.utils.interfaces.queue import Queue
 from shared.utils.redis_queue import RedisQueue
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 # Global ID generator instance (singleton)

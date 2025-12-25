@@ -4,10 +4,11 @@ Redis-based queue implementation.
 import json
 import redis.asyncio as aioredis
 from typing import Optional, List, Dict, Any
-from shared.utils.interfaces.queue import Queue
-from shared.utils.logger import get_logger
+import logging
 
-logger = get_logger()
+from shared.utils.interfaces.queue import Queue
+
+logger = logging.getLogger(__name__)
 
 
 class RedisQueue(Queue):

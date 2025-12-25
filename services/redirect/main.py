@@ -21,16 +21,20 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from services.redirect.config import settings  # Service-specific settings
-from shared.utils.logger import AppLogger, get_logger
+from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
 from shared.config.dependencies import get_url_repository, get_cache
 from shared.utils.health import check_database, check_redis, check_all_dependencies
 from services.redirect.controllers import redirect_router
 
-# Setup application logger
-log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-AppLogger.setup(level=log_level, enable_console=True)
-logger = get_logger()
+# Setup per-service logging
+setup_logging(
+    service_name="redirect",
+    log_level=settings.log_level,
+    enable_console=True,
+    enable_file=True
+)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application
 app = FastAPI(

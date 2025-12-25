@@ -5,13 +5,13 @@ Handles HTTP routes for URL redirection operations.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse as FastAPIRedirect
+import logging
 
 from shared.core.services import URLService
 from shared.config.dependencies import get_url_service
 from shared.core.exceptions import ShortCodeNotFoundException
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 

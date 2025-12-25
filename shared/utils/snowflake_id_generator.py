@@ -1,10 +1,10 @@
 import time
 import asyncio
+import logging
 
 from shared.utils.interfaces.id_generator import IDGenerator
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 class SnowflakeIDGenerator(IDGenerator):

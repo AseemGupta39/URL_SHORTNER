@@ -5,11 +5,12 @@ import json
 from datetime import datetime
 import redis.asyncio as aioredis
 from typing import Optional, Dict, Any
+import logging
+
 from shared.utils.interfaces.cache import Cache
 from shared.core.schemas import URLData
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 class RedisCache(Cache):

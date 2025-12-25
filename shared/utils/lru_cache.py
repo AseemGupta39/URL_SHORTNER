@@ -8,11 +8,11 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from collections import OrderedDict
 import threading
+import logging
 
 from shared.utils.interfaces.cache import Cache, CacheEntry
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 class LRUCache(Cache):

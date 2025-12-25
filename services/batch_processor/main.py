@@ -16,18 +16,27 @@ project_root = service_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
 from fastapi import FastAPI
+import logging
 
 from services.batch_processor.config import get_settings  # Service-specific settings
+from shared.utils.logging_config import setup_logging
 from shared.config.dependencies import get_url_repository, get_cache
 from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
-from shared.utils.logger import get_logger
 from shared.utils.health import check_database, check_redis, check_all_dependencies
 from shared.middleware.request_id import RequestIDMiddleware
 from services.batch_processor.controllers import batch_router, background_batch_processor, set_dependencies
 
-logger = get_logger()
 settings = get_settings()
+
+# Setup per-service logging
+setup_logging(
+    service_name="batch_processor",
+    log_level=settings.log_level,
+    enable_console=True,
+    enable_file=True
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Batch Processor Service",

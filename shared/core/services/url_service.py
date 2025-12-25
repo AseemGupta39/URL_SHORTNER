@@ -4,6 +4,7 @@ Business logic layer for URL shortening service.
 from datetime import datetime
 from typing import Optional
 from pydantic import HttpUrl
+import logging
 
 from shared.core.schemas import URLData, ShortenResponse, RedirectResponse
 from shared.core.queue_messages import URLQueueMessage
@@ -12,9 +13,8 @@ from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.interfaces.cache import Cache
 from shared.utils.interfaces.queue import Queue
 from shared.core.exceptions import ShortCodeNotFoundException
-from shared.utils.logger import get_logger
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 
 
 class URLService:

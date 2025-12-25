@@ -18,10 +18,10 @@ from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
 from shared.core.schemas import URLData
 from shared.core.queue_messages import URLQueueMessage
-from shared.utils.logger import get_logger
 from shared.utils import request_context
+import logging
 
-logger = get_logger()
+logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter()
 
