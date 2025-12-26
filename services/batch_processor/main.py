@@ -25,7 +25,8 @@ from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
 from shared.utils.health import check_database, check_redis, check_all_dependencies
 from shared.middleware.request_id import RequestIDMiddleware
-from services.batch_processor.controllers import batch_router, background_batch_processor, set_dependencies
+from services.batch_processor.controllers import batch_router, set_dependencies
+from services.batch_processor.batch_worker import background_batch_processor
 
 settings = get_settings()
 

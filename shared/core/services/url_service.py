@@ -68,37 +68,68 @@ class URLService:
         4. Queue for batch DB insert
         5. Return response instantly
         """
-        short_code = await self.id_generator.generate_short_code()
-        logger.debug(f"Generated short code: {short_code}")
+        logger.info(f"Shortening URL: {original_url}")
 
-        url_data = URLData(
-            short_code=short_code,
-            original_url=str(original_url),
-            created_at=datetime.now()
-        )
+        try:
+            # Generate short code
+            short_code = await self.id_generator.generate_short_code()
+            logger.debug(f"Generated short_code={short_code} for url={original_url}")
 
-        # Write to cache first for immediate availability
-        if self.cache:
-            await self.cache.set_async(short_code, url_data)
-            logger.debug(f"Cached: {short_code}")
+            url_data = URLData(
+                short_code=short_code,
+                original_url=str(original_url),
+                created_at=datetime.now()
+            )
 
-        # Queue for batch insert
-        if self.queue:
-            queue_msg = URLQueueMessage.from_url_data(
-                short_code=url_data.short_code,
-                original_url=url_data.original_url,
+            # Write to cache first for immediate availability
+            if self.cache:
+                try:
+                    await self.cache.set_async(short_code, url_data)
+                    logger.debug(f"Cache WRITE successful: short_code={short_code}")
+                except Exception as e:
+                    logger.error(
+                        f"Cache WRITE failed: short_code={short_code} | error={str(e)}",
+                        exc_info=True
+                    )
+                    # Continue even if cache fails - queue will persist to DB
+
+            # Queue for batch insert
+            if self.queue:
+                try:
+                    queue_msg = URLQueueMessage.from_url_data(
+                        short_code=url_data.short_code,
+                        original_url=url_data.original_url,
+                        created_at=url_data.created_at
+                    )
+                    await self.queue.enqueue(queue_msg.to_dict())
+                    logger.debug(f"Queue ENQUEUE successful: short_code={short_code}")
+                except Exception as e:
+                    logger.error(
+                        f"Queue ENQUEUE failed: short_code={short_code} | error={str(e)}",
+                        exc_info=True
+                    )
+                    # Critical: if queue fails, URL won't persist to DB!
+                    raise
+
+            short_url = f"{self.base_url_scheme}://{self.base_domain}/{short_code}"
+
+            logger.info(
+                f"URL shortened successfully: short_code={short_code} | "
+                f"short_url={short_url} | original_url={original_url}"
+            )
+
+            return ShortenResponse(
+                short_code=short_code,
+                short_url=short_url,
                 created_at=url_data.created_at
             )
-            await self.queue.enqueue(queue_msg.to_dict())
-            logger.debug(f"Queued: {short_code}")
 
-        short_url = f"{self.base_url_scheme}://{self.base_domain}/{short_code}"
-
-        return ShortenResponse(
-            short_code=short_code,
-            short_url=short_url,
-            created_at=url_data.created_at
-        )
+        except Exception as e:
+            logger.error(
+                f"Failed to shorten URL: original_url={original_url} | error={str(e)}",
+                exc_info=True
+            )
+            raise
 
     async def resolve(self, short_code: str) -> RedirectResponse:
         """
@@ -113,30 +144,75 @@ class URLService:
         Raises:
             ShortCodeNotFoundException: If the short code doesn't exist
         """
-        # Check cache first (if enabled)
-        if self.cache:
-            cached_data = await self.cache.get_async(short_code)
-            if cached_data is not None:
-                logger.debug(f"Cache HIT: {short_code}")
-                return RedirectResponse(
-                    original_url=HttpUrl(cached_data.original_url),
-                    status="found"
+        logger.info(f"Resolving short_code={short_code}")
+
+        try:
+            # Check cache first (if enabled)
+            if self.cache:
+                try:
+                    cached_data = await self.cache.get_async(short_code)
+                    if cached_data is not None:
+                        logger.info(
+                            f"Cache HIT: short_code={short_code} | "
+                            f"original_url={cached_data.original_url}"
+                        )
+                        return RedirectResponse(
+                            original_url=HttpUrl(cached_data.original_url),
+                            status="found"
+                        )
+                    logger.debug(f"Cache MISS: short_code={short_code}")
+                except Exception as e:
+                    logger.error(
+                        f"Cache READ failed: short_code={short_code} | error={str(e)}",
+                        exc_info=True
+                    )
+                    # Continue to DB lookup on cache error
+
+            # Query repository on cache miss
+            logger.debug(f"Querying DB for short_code={short_code}")
+            import time
+            db_start = time.time()
+
+            url_data = await self.url_repo.get_by_short_code(short_code)
+
+            db_duration_ms = (time.time() - db_start) * 1000
+
+            if url_data is None:
+                logger.warning(
+                    f"Short code NOT FOUND: short_code={short_code} | "
+                    f"db_query_time={db_duration_ms:.2f}ms"
                 )
-            logger.debug(f"Cache MISS: {short_code}")
+                raise ShortCodeNotFoundException(short_code)
 
-        # Query repository on cache miss
-        url_data = await self.url_repo.get_by_short_code(short_code)
+            logger.info(
+                f"DB lookup successful: short_code={short_code} | "
+                f"original_url={url_data.original_url} | "
+                f"db_query_time={db_duration_ms:.2f}ms"
+            )
 
-        if url_data is None:
-            logger.warning(f"Short code not found: {short_code}")
-            raise ShortCodeNotFoundException(short_code)
+            # Warm cache for future requests
+            if self.cache:
+                try:
+                    await self.cache.set_async(short_code, url_data)
+                    logger.debug(f"Cache WARM successful: short_code={short_code}")
+                except Exception as e:
+                    logger.error(
+                        f"Cache WARM failed: short_code={short_code} | error={str(e)}",
+                        exc_info=True
+                    )
+                    # Don't fail the request if cache warm fails
 
-        # Warm cache for future requests
-        if self.cache:
-            await self.cache.set_async(short_code, url_data)
-            logger.debug(f"Cache updated: {short_code}")
+            return RedirectResponse(
+                original_url=HttpUrl(url_data.original_url),
+                status="found"
+            )
 
-        return RedirectResponse(
-            original_url=HttpUrl(url_data.original_url),
-            status="found"
-        )
+        except ShortCodeNotFoundException:
+            # Re-raise as-is (already logged above)
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to resolve short_code={short_code} | error={str(e)}",
+                exc_info=True
+            )
+            raise
