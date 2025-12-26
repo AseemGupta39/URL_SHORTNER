@@ -30,3 +30,6 @@ mypy==1.13.0
 # Utilities
 python-dotenv==1.0.1
 colorlog==6.8.2  # Colored logging for better readability
+
+# Monitoring & Metrics
+prometheus-client==0.21.0  # Prometheus metrics for observability
