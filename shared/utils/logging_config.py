@@ -96,7 +96,7 @@ def setup_logging(
         log_format = _get_json_format()
     else:
         # Standard format: timestamp [level] [request_id] [module:line:function] message
-        log_format = "%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(lineno)d:%(funcName)s] %(message)s"
+        log_format = "%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s"
         date_format = "%Y-%m-%d %H:%M:%S"
 
     # Console handler with colors
@@ -107,7 +107,7 @@ def setup_logging(
         if HAS_COLORLOG and not json_format:
             # Colored console formatter (includes request_id from context)
             console_formatter = colorlog.ColoredFormatter(
-                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(lineno)d:%(funcName)s]%(reset)s %(message)s",
+                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(funcName)s:%(lineno)d]%(reset)s %(message)s",
                 datefmt=date_format,
                 log_colors={
                     "DEBUG": "cyan",
@@ -179,7 +179,7 @@ def _get_json_format() -> str:
     """
     # For now, return standard format
     # TODO: Implement proper JSON formatter with python-json-logger
-    return "%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d:%(funcName)s] %(message)s"
+    return "%(asctime)s [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s"
 
 
 def _configure_third_party_loggers() -> None:
