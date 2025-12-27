@@ -25,6 +25,12 @@ from shared.middleware.metrics_definitions import (
     batch_processed_total,
     batch_urls_inserted_total
 )
+from shared.middleware.metrics_enums import (
+    CacheOperation,
+    CacheResult,
+    DBOperation,
+    QueueOperation
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,27 +119,55 @@ def metrics_endpoint() -> Response:
 
 # Service-layer metric helpers
 
-def track_cache_operation(operation: str, result: str, service: str):
-    """Track cache operation (get/set/delete → hit/miss/success/failure)."""
+def track_cache_operation(
+    operation: CacheOperation,
+    result: CacheResult,
+    service: str
+):
+    """
+    Track cache operation with type-safe enums.
+
+    Args:
+        operation: CacheOperation (GET/SET/DELETE)
+        result: CacheResult (HIT/MISS/SUCCESS/FAILURE)
+        service: Service name (shorten/redirect/batch_processor)
+    """
     cache_operations_total.labels(
-        operation=operation,
-        result=result,
+        operation=operation.value,
+        result=result.value,
         service=service
     ).inc()
 
 
-def track_db_operation(operation: str, duration_seconds: float, service: str):
-    """Track DB operation (read/write/batch_write) with timing."""
-    db_operations_total.labels(operation=operation, service=service).inc()
+def track_db_operation(
+    operation: DBOperation,
+    duration_seconds: float,
+    service: str
+):
+    """
+    Track DB operation with timing and type-safe enums.
+
+    Args:
+        operation: DBOperation (READ/WRITE/BATCH_WRITE)
+        duration_seconds: Operation duration in seconds
+        service: Service name (shorten/redirect/batch_processor)
+    """
+    db_operations_total.labels(operation=operation.value, service=service).inc()
     db_operation_duration_seconds.labels(
-        operation=operation,
+        operation=operation.value,
         service=service
     ).observe(duration_seconds)
 
 
-def track_queue_operation(operation: str, service: str):
-    """Track queue operation (enqueue/dequeue)."""
-    queue_operations_total.labels(operation=operation, service=service).inc()
+def track_queue_operation(operation: QueueOperation, service: str):
+    """
+    Track queue operation with type-safe enums.
+
+    Args:
+        operation: QueueOperation (ENQUEUE/DEQUEUE)
+        service: Service name (shorten/redirect/batch_processor)
+    """
+    queue_operations_total.labels(operation=operation.value, service=service).inc()
 
 
 def update_queue_size(size: int, service: str):

@@ -13,6 +13,17 @@ from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.interfaces.cache import Cache
 from shared.utils.interfaces.queue import Queue
 from shared.core.exceptions import ShortCodeNotFoundException
+from shared.middleware.metrics import (
+    track_cache_operation,
+    track_queue_operation,
+    track_url_shortened,
+    track_url_redirected
+)
+from shared.middleware.metrics_enums import (
+    CacheOperation,
+    CacheResult,
+    QueueOperation
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +42,8 @@ class URLService:
         cache: Cache,
         queue: Queue,
         base_domain: str = "short.ly",
-        base_url_scheme: str = "https"
+        base_url_scheme: str = "https",
+        service_name: str = "shorten"
     ):
         """
         Initialize URL service.
@@ -43,6 +55,7 @@ class URLService:
             queue: Queue for batch processing (Redis, Kafka, etc.)
             base_domain: Base domain for constructing short URLs
             base_url_scheme: URL scheme (http or https)
+            service_name: Service name for metrics (shorten/redirect/batch_processor)
         """
         self.url_repo = url_repo
         self.id_generator = id_generator
@@ -50,6 +63,7 @@ class URLService:
         self.queue = queue
         self.base_domain = base_domain
         self.base_url_scheme = base_url_scheme
+        self.service_name = service_name
 
     async def shorten(self, original_url: HttpUrl) -> ShortenResponse:
         """
@@ -86,11 +100,13 @@ class URLService:
                 try:
                     await self.cache.set_async(short_code, url_data)
                     logger.debug(f"Cache WRITE successful: short_code={short_code}")
+                    track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
                 except Exception as e:
                     logger.error(
                         f"Cache WRITE failed: short_code={short_code} | error={str(e)}",
                         exc_info=True
                     )
+                    track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
                     # Continue even if cache fails - queue will persist to DB
 
             # Queue for batch insert
@@ -103,6 +119,7 @@ class URLService:
                     )
                     await self.queue.enqueue(queue_msg.to_dict())
                     logger.debug(f"Queue ENQUEUE successful: short_code={short_code}")
+                    track_queue_operation(QueueOperation.ENQUEUE, self.service_name)
                 except Exception as e:
                     logger.error(
                         f"Queue ENQUEUE failed: short_code={short_code} | error={str(e)}",
@@ -112,6 +129,9 @@ class URLService:
                     raise
 
             short_url = f"{self.base_url_scheme}://{self.base_domain}/{short_code}"
+
+            # Track business event
+            track_url_shortened(self.service_name)
 
             logger.info(
                 f"URL shortened successfully: short_code={short_code} | "
@@ -156,16 +176,20 @@ class URLService:
                             f"Cache HIT: short_code={short_code} | "
                             f"original_url={cached_data.original_url}"
                         )
+                        track_cache_operation(CacheOperation.GET, CacheResult.HIT, self.service_name)
+                        track_url_redirected(self.service_name)
                         return RedirectResponse(
                             original_url=HttpUrl(cached_data.original_url),
                             status="found"
                         )
                     logger.debug(f"Cache MISS: short_code={short_code}")
+                    track_cache_operation(CacheOperation.GET, CacheResult.MISS, self.service_name)
                 except Exception as e:
                     logger.error(
                         f"Cache READ failed: short_code={short_code} | error={str(e)}",
                         exc_info=True
                     )
+                    track_cache_operation(CacheOperation.GET, CacheResult.FAILURE, self.service_name)
                     # Continue to DB lookup on cache error
 
             # Query repository on cache miss
@@ -195,12 +219,17 @@ class URLService:
                 try:
                     await self.cache.set_async(short_code, url_data)
                     logger.debug(f"Cache WARM successful: short_code={short_code}")
+                    track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
                 except Exception as e:
                     logger.error(
                         f"Cache WARM failed: short_code={short_code} | error={str(e)}",
                         exc_info=True
                     )
+                    track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
                     # Don't fail the request if cache warm fails
+
+            # Track business event
+            track_url_redirected(self.service_name)
 
             return RedirectResponse(
                 original_url=HttpUrl(url_data.original_url),
