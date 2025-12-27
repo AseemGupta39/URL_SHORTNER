@@ -135,12 +135,12 @@ async def redis_health_check():
     return result
 
 
-@app.get("/metrics")
+@app.get("/metrics", tags=["Metrics"])
 async def metrics():
     """Expose Prometheus metrics."""
     return metrics_endpoint()
 
-# Include API routers
+# Include API routers (AFTER defining /metrics to prevent /{short_code} from catching it)
 app.include_router(redirect_router)
 
 logger.info("Redirect Service started")

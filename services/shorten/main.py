@@ -140,12 +140,12 @@ async def redis_health_check():
     return result
 
 
-@app.get("/metrics")
+@app.get("/metrics", tags=["Metrics"])
 async def metrics():
     """Expose Prometheus metrics."""
     return metrics_endpoint()
 
-# Include API routers
+# Include API routers (AFTER defining /metrics to prevent route conflicts)
 app.include_router(url_router)
 
 logger.info(f"Shorten Service started (DC={settings.datacenter_id}, W={settings.worker_id})")

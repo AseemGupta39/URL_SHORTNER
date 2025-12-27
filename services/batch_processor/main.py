@@ -126,12 +126,12 @@ async def redis_health_check():
     return result
 
 
-@app.get("/metrics")
+@app.get("/metrics", tags=["Metrics"])
 async def metrics():
     """Expose Prometheus metrics."""
     return metrics_endpoint()
 
-# Include API routers
+# Include API routers (AFTER defining /metrics)
 app.include_router(batch_router)
 
 # Global instances (initialized in startup event)
