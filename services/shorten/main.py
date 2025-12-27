@@ -24,6 +24,7 @@ import logging
 from services.shorten.config import settings  # Service-specific settings
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
+from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_url_repository, get_cache
 from shared.utils.health import check_database, check_redis, check_all_dependencies
 from services.shorten.controllers import url_router
@@ -49,6 +50,9 @@ app = FastAPI(
 
 # Add Request ID middleware (must be added before CORS)
 app.add_middleware(RequestIDMiddleware)
+
+# Add Prometheus metrics middleware
+app.add_middleware(PrometheusMiddleware, service_name="shorten")
 
 # Configure CORS
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -134,6 +138,12 @@ async def redis_health_check():
             error=str(e)
         )
     return result
+
+
+@app.get("/metrics")
+async def metrics():
+    """Expose Prometheus metrics."""
+    return metrics_endpoint()
 
 # Include API routers
 app.include_router(url_router)
