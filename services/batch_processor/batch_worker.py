@@ -15,6 +15,13 @@ from shared.data.repositories import URLRepository
 from shared.core.schemas import URLData
 from shared.core.queue_messages import URLQueueMessage
 from shared.utils import request_context
+from shared.middleware.metrics import (
+    track_queue_operation,
+    track_db_operation,
+    update_queue_size,
+    track_batch_processed
+)
+from shared.middleware.metrics_enums import QueueOperation, DBOperation
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -45,6 +52,7 @@ async def process_batch_from_queue(
 
     try:
         queue_size = await redis_queue.size()
+        update_queue_size(queue_size, "batch_processor")
 
         if queue_size == 0:
             logger.debug("Queue empty, skipping batch processing")
@@ -61,6 +69,7 @@ async def process_batch_from_queue(
 
         start_time = time.time()
         items = await redis_queue.dequeue(count=batch_size)
+        track_queue_operation(QueueOperation.DEQUEUE, "batch_processor")
 
         if not items:
             return {
@@ -113,9 +122,18 @@ async def process_batch_from_queue(
         try:
             inserted_count = await url_repo.batch_create(url_data_list)
             db_duration_ms = (time.time() - db_start) * 1000
+            db_duration_seconds = db_duration_ms / 1000
+
+            # Track DB operation with timing
+            track_db_operation(DBOperation.BATCH_WRITE, db_duration_seconds, "batch_processor")
 
             remaining_size = await redis_queue.size()
+            update_queue_size(remaining_size, "batch_processor")
+
             total_duration_ms = (time.time() - start_time) * 1000
+
+            # Track business event
+            track_batch_processed(inserted_count, "batch_processor")
 
             logger.info(
                 f"Batch INSERT successful: batch_id={batch_id} | "
