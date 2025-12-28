@@ -3,6 +3,7 @@ Pydantic schemas for URL shortener API and internal data models.
 """
 from pydantic import BaseModel, HttpUrl
 from datetime import datetime
+from typing import Optional
 
 
 class ShortenRequest(BaseModel):
@@ -52,5 +53,27 @@ class URLData(BaseModel):
                 "short_code": "abc12345",
                 "original_url": "https://example.com/very/long/path",
                 "created_at": "2024-01-15T10:30:00Z"
+            }
+        }
+
+
+class ClickData(BaseModel):
+    """Domain model for click analytics data (before persistence)."""
+    short_code: str
+    original_url: str
+    clicked_at: datetime
+    ip_address: str
+    user_agent: str
+    referrer: Optional[str] = None  # Can be empty for direct navigation
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "short_code": "abc12345",
+                "original_url": "https://example.com/very/long/path",
+                "clicked_at": "2024-01-15T10:30:00Z",
+                "ip_address": "192.168.1.1",
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "referrer": "https://google.com"
             }
         }

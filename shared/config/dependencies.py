@@ -8,7 +8,10 @@ from shared.config.settings import settings
 from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.data.repositories import URLRepository, SQLiteURLRepository
+from shared.data.interfaces.click_repository import ClickRepository
+from shared.data.repositories.click_repository import SQLiteClickRepository
 from shared.core.services import URLService
+from shared.core.services.click_analytics_service import ClickAnalyticsService
 from shared.utils.interfaces.cache import Cache
 from shared.utils.lru_cache import LRUCache
 from shared.utils.redis_cache import RedisCache
@@ -191,3 +194,60 @@ async def get_url_service(
         )
 
     return _url_service_instance
+
+
+# Global Click repository instance (singleton)
+_click_repository_instance: ClickRepository | None = None
+
+
+async def get_click_repository() -> ClickRepository:
+    """
+    Get the global Click repository instance (singleton).
+
+    IMPORTANT: Must be singleton to reuse database connection pool.
+
+    Returns:
+        SQLiteClickRepository configured from settings with connection pooling.
+    """
+    global _click_repository_instance
+
+    if _click_repository_instance is None:
+        logger.info("Initializing ClickRepository (singleton)")
+        _click_repository_instance = SQLiteClickRepository(
+            db_url=settings.database_url,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_pool_max_overflow,
+            pool_timeout=settings.db_pool_timeout,
+            pool_recycle=settings.db_pool_recycle,
+            pool_pre_ping=settings.db_pool_pre_ping,
+            echo_pool=settings.db_echo_pool
+        )
+        await _click_repository_instance.initialize()
+
+    return _click_repository_instance
+
+
+# Global Click Analytics service instance (singleton)
+_click_analytics_service_instance: ClickAnalyticsService | None = None
+
+
+async def get_click_analytics_service(
+    click_repo: ClickRepository = Depends(get_click_repository),
+    queue: Queue = Depends(get_queue)
+) -> ClickAnalyticsService:
+    """
+    Get the global Click Analytics service instance (singleton).
+
+    Returns:
+        ClickAnalyticsService with queue-based batch processing
+    """
+    global _click_analytics_service_instance
+
+    if _click_analytics_service_instance is None:
+        logger.info("Initializing ClickAnalyticsService (singleton)")
+        _click_analytics_service_instance = ClickAnalyticsService(
+            click_repo=click_repo,
+            queue=queue
+        )
+
+    return _click_analytics_service_instance

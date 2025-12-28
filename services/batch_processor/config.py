@@ -40,7 +40,10 @@ class BatchProcessorServiceSettings(BaseSettings):
     queue_enabled: bool = False
     batch_size: int = 100
     batch_interval_seconds: int = 10
-    enable_background_scheduler: bool = True  # True for local dev
+    enable_background_scheduler: bool = True  # True for local dev, False for production (use cron)
+
+    # Click Analytics Configuration
+    click_batch_interval_seconds: int = 5  # Process clicks more frequently than URLs
 
     class Config:
         env_file = ".env"
