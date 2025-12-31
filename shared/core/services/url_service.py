@@ -146,11 +146,36 @@ class URLService:
                 logger.warning(
                     f"Using sync DB write (queue unavailable or failed): short_code={short_code}"
                 )
-                await self.url_repo.batch_create([url_data])
-                logger.info(
-                    f"URL saved to DB (sync fallback): short_code={short_code} | "
-                    f"original_url={original_url}"
-                )
+                try:
+                    await self.url_repo.batch_create([url_data])
+                    logger.info(
+                        f"URL saved to DB (sync fallback): short_code={short_code} | "
+                        f"original_url={original_url}"
+                    )
+                except Exception as db_error:
+                    # CRITICAL: Both queue AND DB failed - rollback cache to prevent orphaned entry
+                    logger.error(
+                        f"CRITICAL: Queue and DB both failed, rolling back cache: "
+                        f"short_code={short_code} | error={db_error}",
+                        exc_info=True
+                    )
+
+                    # Rollback cache write (compensating transaction)
+                    if cache_success:
+                        rollback_success = await self.cache.delete_async(short_code)
+                        if rollback_success:
+                            logger.info(f"Cache rollback successful: short_code={short_code}")
+                            track_cache_operation(CacheOperation.DELETE, CacheResult.SUCCESS, self.service_name)
+                        else:
+                            logger.error(
+                                f"Cache rollback FAILED: short_code={short_code} | "
+                                f"Orphaned cache entry will cause 404 after TTL expires!",
+                                exc_info=True
+                            )
+                            track_cache_operation(CacheOperation.DELETE, CacheResult.FAILURE, self.service_name)
+
+                    # Re-raise DB error to fail the request (user gets 500, not 200)
+                    raise
 
             short_url = f"{self.base_url_scheme}://{self.base_domain}/{short_code}"
 
