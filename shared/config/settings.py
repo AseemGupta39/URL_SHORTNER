@@ -4,6 +4,7 @@ Application settings configuration.
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
+from pydantic import field_validator, model_validator
 
 
 class Settings(BaseSettings):
@@ -74,6 +75,121 @@ class Settings(BaseSettings):
     batch_size: int = 100  # Number of URLs to batch insert at once
     batch_interval_seconds: int = 10  # Process queue every N seconds
     enable_background_scheduler: bool = False  # Background processing (set True in local .env for dev)
+
+    # Click Analytics Configuration
+    click_batch_interval_seconds: int = 30  # Process click queue every N seconds
+
+    # Validators
+    @field_validator('datacenter_id')
+    @classmethod
+    def validate_datacenter_id(cls, v, info):
+        """Validate datacenter_id is within valid range (0-15 for 4 bits)."""
+        max_value = (1 << info.data.get('datacenter_bits', 4)) - 1
+        if v < 0 or v > max_value:
+            raise ValueError(f"datacenter_id must be between 0 and {max_value}")
+        return v
+
+    @field_validator('worker_id')
+    @classmethod
+    def validate_worker_id(cls, v, info):
+        """Validate worker_id is within valid range (0-3 for 2 bits)."""
+        max_value = (1 << info.data.get('worker_bits', 2)) - 1
+        if v < 0 or v > max_value:
+            raise ValueError(f"worker_id must be between 0 and {max_value}")
+        return v
+
+    @field_validator('timestamp_bits', 'datacenter_bits', 'worker_bits', 'sequence_bits')
+    @classmethod
+    def validate_bit_fields(cls, v, info):
+        """Validate bit field sizes are positive."""
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be positive")
+        return v
+
+    @model_validator(mode='after')
+    def validate_total_bits(self):
+        """Validate total bit allocation is exactly 47 for 8-character base62 codes."""
+        total_bits = (
+            self.timestamp_bits +
+            self.datacenter_bits +
+            self.worker_bits +
+            self.sequence_bits
+        )
+        # 47 bits produces 8-character base62 codes (this is a resume project, not commercial)
+        if total_bits != 47:
+            raise ValueError(
+                f"Total bits must be exactly 47 for 8-character codes (got {total_bits}). "
+                f"Current allocation: timestamp={self.timestamp_bits}, "
+                f"datacenter={self.datacenter_bits}, worker={self.worker_bits}, "
+                f"sequence={self.sequence_bits}"
+            )
+        return self
+
+    @field_validator('log_level')
+    @classmethod
+    def validate_log_level(cls, v):
+        """Validate log level is a valid Python logging level."""
+        valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        v_upper = v.upper()
+        if v_upper not in valid_levels:
+            raise ValueError(f"log_level must be one of {valid_levels}")
+        return v_upper
+
+    @field_validator('base_url_scheme')
+    @classmethod
+    def validate_url_scheme(cls, v):
+        """Validate URL scheme is http or https."""
+        if v not in ['http', 'https']:
+            raise ValueError("base_url_scheme must be 'http' or 'https'")
+        return v
+
+    @field_validator('batch_size')
+    @classmethod
+    def validate_batch_size(cls, v):
+        """Validate batch size is reasonable."""
+        if v <= 0:
+            raise ValueError("batch_size must be positive")
+        if v > 10000:
+            raise ValueError("batch_size should not exceed 10000 for performance reasons")
+        return v
+
+    @field_validator('batch_interval_seconds', 'click_batch_interval_seconds')
+    @classmethod
+    def validate_interval_seconds(cls, v):
+        """Validate interval is reasonable."""
+        if v <= 0:
+            raise ValueError(f"Interval must be positive")
+        if v > 3600:
+            raise ValueError(f"Interval should not exceed 3600 seconds (1 hour)")
+        return v
+
+    @field_validator('cache_ttl_seconds')
+    @classmethod
+    def validate_cache_ttl(cls, v):
+        """Validate cache TTL is reasonable."""
+        if v <= 0:
+            raise ValueError("cache_ttl_seconds must be positive")
+        return v
+
+    @field_validator('db_pool_size', 'db_pool_max_overflow')
+    @classmethod
+    def validate_pool_sizes(cls, v):
+        """Validate pool sizes are reasonable."""
+        if v < 0:
+            raise ValueError("Pool size must be non-negative")
+        if v > 1000:
+            raise ValueError("Pool size should not exceed 1000")
+        return v
+
+    @field_validator('redis_pool_max_connections')
+    @classmethod
+    def validate_redis_pool(cls, v):
+        """Validate Redis pool size is reasonable."""
+        if v <= 0:
+            raise ValueError("redis_pool_max_connections must be positive")
+        if v > 1000:
+            raise ValueError("redis_pool_max_connections should not exceed 1000")
+        return v
 
     class Config:
         # Look for .env in current working directory
