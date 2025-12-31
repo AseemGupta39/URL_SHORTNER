@@ -3,6 +3,7 @@ Dependency injection factories for FastAPI.
 """
 from fastapi import Depends
 import logging
+import asyncio
 
 from shared.config.settings import settings
 from shared.utils.interfaces.id_generator import IDGenerator
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Global ID generator instance (singleton)
 _id_generator_instance: IDGenerator | None = None
+_id_generator_lock = asyncio.Lock()
 
 
 async def get_id_generator() -> IDGenerator:
@@ -33,28 +35,38 @@ async def get_id_generator() -> IDGenerator:
     Creating a new instance per request would reset sequence to 0,
     causing duplicate IDs for concurrent requests in the same second.
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance (avoids lock on every call)
+
     Returns:
         SnowflakeIDGenerator configured from settings
     """
     global _id_generator_instance
 
+    # Fast path: instance already exists (no lock needed)
     if _id_generator_instance is None:
-        logger.info("Initializing SnowflakeIDGenerator (singleton)")
-        _id_generator_instance = SnowflakeIDGenerator(
-            datacenter_id=settings.datacenter_id,
-            worker_id=settings.worker_id,
-            epoch_sec=settings.epoch_sec,
-            timestamp_bits=settings.timestamp_bits,
-            datacenter_bits=settings.datacenter_bits,
-            worker_bits=settings.worker_bits,
-            sequence_bits=settings.sequence_bits
-        )
+        # Slow path: acquire lock for initialization
+        async with _id_generator_lock:
+            # Double-check: another coroutine may have initialized while we waited
+            if _id_generator_instance is None:
+                logger.info("Initializing SnowflakeIDGenerator (singleton)")
+                _id_generator_instance = SnowflakeIDGenerator(
+                    datacenter_id=settings.datacenter_id,
+                    worker_id=settings.worker_id,
+                    epoch_sec=settings.epoch_sec,
+                    timestamp_bits=settings.timestamp_bits,
+                    datacenter_bits=settings.datacenter_bits,
+                    worker_bits=settings.worker_bits,
+                    sequence_bits=settings.sequence_bits
+                )
 
     return _id_generator_instance
 
 
 # Global cache instance (singleton)
 _cache_instance: Cache | None = None
+_cache_lock = asyncio.Lock()
 
 
 async def get_cache() -> Cache:
@@ -66,34 +78,44 @@ async def get_cache() -> Cache:
     - Connections are reused across requests for better performance
     - Pool size configured via settings.redis_pool_max_connections
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
     Returns:
         RedisCache if Redis is enabled, otherwise LRUCache
     """
     global _cache_instance
 
+    # Fast path: instance already exists
     if _cache_instance is None:
-        if settings.redis_enabled and settings.redis_url:
-            logger.info("Initializing RedisCache with connection pooling")
-            _cache_instance = RedisCache(
-                redis_url=settings.redis_url,
-                ttl_seconds=settings.cache_ttl_seconds,
-                max_connections=settings.redis_pool_max_connections,
-                socket_timeout=settings.redis_cache_socket_timeout,
-                socket_connect_timeout=settings.redis_cache_connect_timeout
-            )
-            await _cache_instance.connect()
-        else:
-            logger.info("Initializing LRUCache")
-            _cache_instance = LRUCache(
-                max_size=settings.cache_max_size,
-                ttl_seconds=settings.cache_ttl_seconds
-            )
+        # Slow path: acquire lock for initialization
+        async with _cache_lock:
+            # Double-check: another coroutine may have initialized while we waited
+            if _cache_instance is None:
+                if settings.redis_enabled and settings.redis_url:
+                    logger.info("Initializing RedisCache with connection pooling")
+                    _cache_instance = RedisCache(
+                        redis_url=settings.redis_url,
+                        ttl_seconds=settings.cache_ttl_seconds,
+                        max_connections=settings.redis_pool_max_connections,
+                        socket_timeout=settings.redis_cache_socket_timeout,
+                        socket_connect_timeout=settings.redis_cache_connect_timeout
+                    )
+                    await _cache_instance.connect()
+                else:
+                    logger.info("Initializing LRUCache")
+                    _cache_instance = LRUCache(
+                        max_size=settings.cache_max_size,
+                        ttl_seconds=settings.cache_ttl_seconds
+                    )
 
     return _cache_instance
 
 
 # Global queue instance (singleton)
 _queue_instance: Queue | None = None
+_queue_lock = asyncio.Lock()
 
 
 async def get_queue() -> Queue:
@@ -105,29 +127,39 @@ async def get_queue() -> Queue:
     - Connections are reused across requests for better performance
     - Pool size configured via settings.redis_pool_max_connections
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
     Returns:
         RedisQueue for batch processing
     """
     global _queue_instance
 
+    # Fast path: instance already exists
     if _queue_instance is None:
-        if settings.queue_enabled and settings.redis_url:
-            logger.info("Initializing RedisQueue with connection pooling")
-            _queue_instance = RedisQueue(
-                redis_url=settings.redis_url,
-                max_connections=settings.redis_pool_max_connections,
-                socket_timeout=settings.redis_queue_socket_timeout,
-                socket_connect_timeout=settings.redis_queue_connect_timeout
-            )
-            await _queue_instance.connect()
-        else:
-            raise RuntimeError("Queue is required but not enabled in settings")
+        # Slow path: acquire lock for initialization
+        async with _queue_lock:
+            # Double-check: another coroutine may have initialized while we waited
+            if _queue_instance is None:
+                if settings.queue_enabled and settings.redis_url:
+                    logger.info("Initializing RedisQueue with connection pooling")
+                    _queue_instance = RedisQueue(
+                        redis_url=settings.redis_url,
+                        max_connections=settings.redis_pool_max_connections,
+                        socket_timeout=settings.redis_queue_socket_timeout,
+                        socket_connect_timeout=settings.redis_queue_connect_timeout
+                    )
+                    await _queue_instance.connect()
+                else:
+                    raise RuntimeError("Queue is required but not enabled in settings")
 
     return _queue_instance
 
 
 # Global URL repository instance (singleton)
 _url_repository_instance: URLRepository | None = None
+_url_repository_lock = asyncio.Lock()
 
 
 async def get_url_repository() -> URLRepository:
@@ -138,6 +170,10 @@ async def get_url_repository() -> URLRepository:
     Creating a new instance per request would create a new engine with
     its own connection pool, wasting database connections.
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
     Returns:
         SQLiteURLRepository configured from settings with connection pooling.
         - SQLite (development): No pooling
@@ -146,23 +182,26 @@ async def get_url_repository() -> URLRepository:
     global _url_repository_instance
 
     if _url_repository_instance is None:
-        logger.info("Initializing URLRepository (singleton)")
-        _url_repository_instance = SQLiteURLRepository(
-            db_url=settings.database_url,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_pool_max_overflow,
-            pool_timeout=settings.db_pool_timeout,
-            pool_recycle=settings.db_pool_recycle,
-            pool_pre_ping=settings.db_pool_pre_ping,
-            echo_pool=settings.db_echo_pool
-        )
-        await _url_repository_instance.initialize()
+        async with _url_repository_lock:
+            if _url_repository_instance is None:
+                logger.info("Initializing URLRepository (singleton)")
+                _url_repository_instance = SQLiteURLRepository(
+                    db_url=settings.database_url,
+                    pool_size=settings.db_pool_size,
+                    max_overflow=settings.db_pool_max_overflow,
+                    pool_timeout=settings.db_pool_timeout,
+                    pool_recycle=settings.db_pool_recycle,
+                    pool_pre_ping=settings.db_pool_pre_ping,
+                    echo_pool=settings.db_echo_pool
+                )
+                await _url_repository_instance.initialize()
 
     return _url_repository_instance
 
 
 # Global URL service instance (singleton)
 _url_service_instance: URLService | None = None
+_url_service_lock = asyncio.Lock()
 
 
 async def get_url_service(
@@ -177,27 +216,34 @@ async def get_url_service(
     IMPORTANT: Must be singleton for consistency and to avoid
     creating unnecessary service objects per request.
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
     Returns:
         URLService with cache-first and queue-based batch processing
     """
     global _url_service_instance
 
     if _url_service_instance is None:
-        logger.info("Initializing URLService (singleton)")
-        _url_service_instance = URLService(
-            url_repo=url_repo,
-            id_generator=id_generator,
-            cache=cache,
-            queue=queue,
-            base_domain=settings.base_domain,
-            base_url_scheme=settings.base_url_scheme
-        )
+        async with _url_service_lock:
+            if _url_service_instance is None:
+                logger.info("Initializing URLService (singleton)")
+                _url_service_instance = URLService(
+                    url_repo=url_repo,
+                    id_generator=id_generator,
+                    cache=cache,
+                    queue=queue,
+                    base_domain=settings.base_domain,
+                    base_url_scheme=settings.base_url_scheme
+                )
 
     return _url_service_instance
 
 
 # Global Click repository instance (singleton)
 _click_repository_instance: ClickRepository | None = None
+_click_repository_lock = asyncio.Lock()
 
 
 async def get_click_repository() -> ClickRepository:
@@ -206,29 +252,36 @@ async def get_click_repository() -> ClickRepository:
 
     IMPORTANT: Must be singleton to reuse database connection pool.
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
     Returns:
         SQLiteClickRepository configured from settings with connection pooling.
     """
     global _click_repository_instance
 
     if _click_repository_instance is None:
-        logger.info("Initializing ClickRepository (singleton)")
-        _click_repository_instance = SQLiteClickRepository(
-            db_url=settings.database_url,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_pool_max_overflow,
-            pool_timeout=settings.db_pool_timeout,
-            pool_recycle=settings.db_pool_recycle,
-            pool_pre_ping=settings.db_pool_pre_ping,
-            echo_pool=settings.db_echo_pool
-        )
-        await _click_repository_instance.initialize()
+        async with _click_repository_lock:
+            if _click_repository_instance is None:
+                logger.info("Initializing ClickRepository (singleton)")
+                _click_repository_instance = SQLiteClickRepository(
+                    db_url=settings.database_url,
+                    pool_size=settings.db_pool_size,
+                    max_overflow=settings.db_pool_max_overflow,
+                    pool_timeout=settings.db_pool_timeout,
+                    pool_recycle=settings.db_pool_recycle,
+                    pool_pre_ping=settings.db_pool_pre_ping,
+                    echo_pool=settings.db_echo_pool
+                )
+                await _click_repository_instance.initialize()
 
     return _click_repository_instance
 
 
 # Global Click Analytics service instance (singleton)
 _click_analytics_service_instance: ClickAnalyticsService | None = None
+_click_analytics_service_lock = asyncio.Lock()
 
 
 async def get_click_analytics_service(
@@ -238,16 +291,22 @@ async def get_click_analytics_service(
     """
     Get the global Click Analytics service instance (singleton).
 
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
     Returns:
         ClickAnalyticsService with queue-based batch processing
     """
     global _click_analytics_service_instance
 
     if _click_analytics_service_instance is None:
-        logger.info("Initializing ClickAnalyticsService (singleton)")
-        _click_analytics_service_instance = ClickAnalyticsService(
-            click_repo=click_repo,
-            queue=queue
-        )
+        async with _click_analytics_service_lock:
+            if _click_analytics_service_instance is None:
+                logger.info("Initializing ClickAnalyticsService (singleton)")
+                _click_analytics_service_instance = ClickAnalyticsService(
+                    click_repo=click_repo,
+                    queue=queue
+                )
 
     return _click_analytics_service_instance
