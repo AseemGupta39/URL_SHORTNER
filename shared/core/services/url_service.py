@@ -93,7 +93,7 @@ class URLService:
             url_data = URLData(
                 short_code=short_code,
                 original_url=str(original_url),
-                created_at=datetime.now()
+                created_at=datetime.utcnow()
             )
 
             # Concurrent cache + queue writes for optimal latency

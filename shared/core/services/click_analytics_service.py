@@ -75,7 +75,7 @@ class ClickAnalyticsService:
         - Returns bool for caller flexibility (redirect ignores, admin dashboard uses)
         """
         try:
-            clicked_at = datetime.now()
+            clicked_at = datetime.utcnow()
 
             # Try to queue for batch processing
             if self.queue:

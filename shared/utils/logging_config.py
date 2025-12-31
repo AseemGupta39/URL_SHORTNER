@@ -128,7 +128,7 @@ def setup_logging(
     # File handler with rotation and date-based directories
     if enable_file:
         # Create date-based directory structure: logs/{service}/YYYY/MM/DD/
-        now = datetime.now()
+        now = datetime.utcnow()
         log_dir = os.path.join(
             base_log_dir,
             service_name,

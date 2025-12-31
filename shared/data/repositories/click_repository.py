@@ -148,7 +148,7 @@ class SQLiteClickRepository(ClickRepository):
                     ip_address=click_data.ip_address,
                     user_agent=click_data.user_agent,
                     referrer=click_data.referrer,
-                    created_at=datetime.now()
+                    created_at=datetime.utcnow()
                 )
                 for click_data in click_data_list
             ]

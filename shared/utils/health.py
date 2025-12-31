@@ -43,7 +43,7 @@ async def check_database(repository: SQLiteURLRepository) -> DependencyHealth:
     Returns:
         DependencyHealth with connection status and response time
     """
-    start_time = datetime.now()
+    start_time = datetime.utcnow()
 
     try:
         # Simple query to verify database connectivity
@@ -53,7 +53,7 @@ async def check_database(repository: SQLiteURLRepository) -> DependencyHealth:
             from sqlalchemy import select
             await session.execute(select(1))
 
-        response_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+        response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
         # Detect database type from connection URL
         if repository.db_url.startswith("sqlite"):
@@ -73,7 +73,7 @@ async def check_database(repository: SQLiteURLRepository) -> DependencyHealth:
         )
 
     except Exception as e:
-        response_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+        response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
         logger.error(f"Database health check failed: {e}")
 
         return DependencyHealth(
@@ -94,7 +94,7 @@ async def check_redis(cache: Cache) -> DependencyHealth:
     Returns:
         DependencyHealth with connection status and response time
     """
-    start_time = datetime.now()
+    start_time = datetime.utcnow()
 
     # If not using Redis, return N/A status
     if not isinstance(cache, RedisCache):
@@ -109,7 +109,7 @@ async def check_redis(cache: Cache) -> DependencyHealth:
         if cache._client:
             await cache._client.ping()
 
-            response_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+            response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
             # Get cache stats
             stats = cache.get_stats()
@@ -134,7 +134,7 @@ async def check_redis(cache: Cache) -> DependencyHealth:
             )
 
     except Exception as e:
-        response_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+        response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
         logger.error(f"Redis health check failed: {e}")
 
         return DependencyHealth(
@@ -162,7 +162,7 @@ async def check_all_dependencies(
     Returns:
         ServiceHealth with comprehensive status for all dependencies
     """
-    start_time = datetime.now()
+    start_time = datetime.utcnow()
     dependencies = {}
 
     # Check database if repository is provided
@@ -174,7 +174,7 @@ async def check_all_dependencies(
         dependencies["redis"] = await check_redis(cache)
 
     # Calculate total response time
-    total_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+    total_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
     # Determine overall status
     unhealthy_services = [
@@ -187,7 +187,7 @@ async def check_all_dependencies(
     return ServiceHealth(
         service=service_name,
         status=overall_status,
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.utcnow().isoformat(),
         total_response_time_ms=round(total_time_ms, 2),
         dependencies=dependencies if dependencies else None,
         unhealthy_services=unhealthy_services if unhealthy_services else None
