@@ -113,14 +113,16 @@ async def get_cache() -> Cache:
     return _cache_instance
 
 
-# Global queue instance (singleton)
-_queue_instance: Queue | None = None
-_queue_lock = asyncio.Lock()
+# Global URL queue instance (singleton)
+_url_queue_instance: Queue | None = None
+_url_queue_lock = asyncio.Lock()
 
 
-async def get_queue() -> Queue:
+async def get_url_queue() -> Queue:
     """
-    Get the global queue instance (singleton with connection pooling).
+    Get the global URL queue instance (singleton with connection pooling).
+
+    Used for batching URL shortening operations.
 
     Redis Connection Pooling:
     - Like PgBouncer for PostgreSQL, redis-py provides built-in connection pooling
@@ -132,29 +134,77 @@ async def get_queue() -> Queue:
     - Double-checked locking pattern for performance
 
     Returns:
-        RedisQueue for batch processing
+        RedisQueue for URL batch processing (queue_name="url_batch_queue")
     """
-    global _queue_instance
+    global _url_queue_instance
 
     # Fast path: instance already exists
-    if _queue_instance is None:
+    if _url_queue_instance is None:
         # Slow path: acquire lock for initialization
-        async with _queue_lock:
+        async with _url_queue_lock:
             # Double-check: another coroutine may have initialized while we waited
-            if _queue_instance is None:
+            if _url_queue_instance is None:
                 if settings.queue_enabled and settings.redis_url:
-                    logger.info("Initializing RedisQueue with connection pooling")
-                    _queue_instance = RedisQueue(
+                    logger.info("Initializing URL Queue (url_batch_queue)")
+                    _url_queue_instance = RedisQueue(
                         redis_url=settings.redis_url,
+                        queue_name="url_batch_queue",
                         max_connections=settings.redis_pool_max_connections,
                         socket_timeout=settings.redis_queue_socket_timeout,
                         socket_connect_timeout=settings.redis_queue_connect_timeout
                     )
-                    await _queue_instance.connect()
+                    await _url_queue_instance.connect()
                 else:
                     raise RuntimeError("Queue is required but not enabled in settings")
 
-    return _queue_instance
+    return _url_queue_instance
+
+
+# Global Click queue instance (singleton)
+_click_queue_instance: Queue | None = None
+_click_queue_lock = asyncio.Lock()
+
+
+async def get_click_queue() -> Queue:
+    """
+    Get the global Click queue instance (singleton with connection pooling).
+
+    Used for batching click analytics operations.
+
+    Redis Connection Pooling:
+    - Like PgBouncer for PostgreSQL, redis-py provides built-in connection pooling
+    - Connections are reused across requests for better performance
+    - Pool size configured via settings.redis_pool_max_connections
+
+    Thread Safety:
+    - Uses asyncio.Lock() to prevent race conditions during initialization
+    - Double-checked locking pattern for performance
+
+    Returns:
+        RedisQueue for click batch processing (queue_name="click_batch_queue")
+    """
+    global _click_queue_instance
+
+    # Fast path: instance already exists
+    if _click_queue_instance is None:
+        # Slow path: acquire lock for initialization
+        async with _click_queue_lock:
+            # Double-check: another coroutine may have initialized while we waited
+            if _click_queue_instance is None:
+                if settings.queue_enabled and settings.redis_url:
+                    logger.info("Initializing Click Queue (click_batch_queue)")
+                    _click_queue_instance = RedisQueue(
+                        redis_url=settings.redis_url,
+                        queue_name="click_batch_queue",
+                        max_connections=settings.redis_pool_max_connections,
+                        socket_timeout=settings.redis_queue_socket_timeout,
+                        socket_connect_timeout=settings.redis_queue_connect_timeout
+                    )
+                    await _click_queue_instance.connect()
+                else:
+                    raise RuntimeError("Queue is required but not enabled in settings")
+
+    return _click_queue_instance
 
 
 # Global URL repository instance (singleton)
@@ -208,7 +258,7 @@ async def get_url_service(
     url_repo: URLRepository = Depends(get_url_repository),
     id_generator: IDGenerator = Depends(get_id_generator),
     cache: Cache = Depends(get_cache),
-    queue: Queue = Depends(get_queue)
+    queue: Queue = Depends(get_url_queue)
 ) -> URLService:
     """
     Get the global URL service instance (singleton).
@@ -286,7 +336,7 @@ _click_analytics_service_lock = asyncio.Lock()
 
 async def get_click_analytics_service(
     click_repo: ClickRepository = Depends(get_click_repository),
-    queue: Queue = Depends(get_queue)
+    queue: Queue = Depends(get_click_queue)
 ) -> ClickAnalyticsService:
     """
     Get the global Click Analytics service instance (singleton).

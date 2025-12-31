@@ -206,14 +206,3 @@ class RedisQueue(Queue):
         except Exception as e:
             logger.error(f"RedisQueue remove_first error: {e}")
             return False
-
-
-_redis_queue: Optional[RedisQueue] = None
-
-
-def get_redis_queue(redis_url: str, queue_name: str = "url_batch_queue") -> RedisQueue:
-    """Get or create global Redis queue instance."""
-    global _redis_queue
-    if _redis_queue is None:
-        _redis_queue = RedisQueue(redis_url, queue_name)
-    return _redis_queue

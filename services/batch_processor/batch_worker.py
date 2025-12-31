@@ -15,6 +15,7 @@ from shared.data.repositories import URLRepository
 from shared.core.schemas import URLData
 from shared.core.queue_messages import URLQueueMessage
 from shared.utils import request_context
+from shared.utils.interfaces.queue import Queue
 from shared.middleware.metrics import (
     track_queue_operation,
     track_db_operation,
@@ -29,7 +30,7 @@ settings = get_settings()
 
 async def process_batch_from_queue(
     url_repo: URLRepository,
-    redis_queue, # why not queue :Queue here 
+    queue: Queue,
     batch_size: int = None
 ) -> dict:
     """
@@ -37,7 +38,7 @@ async def process_batch_from_queue(
 
     Args:
         url_repo: URL repository for database operations
-        redis_queue: Redis queue instance
+        queue: Queue instance (Redis or other implementation)
         batch_size: Maximum number of URLs to process (defaults to settings)
 
     Returns:
@@ -51,7 +52,7 @@ async def process_batch_from_queue(
     request_context.set_request_id(f"batch-{batch_id}")
 
     try:
-        queue_size = await redis_queue.size()
+        queue_size = await queue.size()
         update_queue_size(queue_size, "batch_processor")
 
         if queue_size == 0:
@@ -70,7 +71,7 @@ async def process_batch_from_queue(
         start_time = time.time()
 
         # Peek at items WITHOUT removing (prevents data loss on DB failure)
-        items = await redis_queue.peek(count=batch_size)
+        items = await queue.peek(count=batch_size)
 
         if not items:
             return {
@@ -131,7 +132,7 @@ async def process_batch_from_queue(
             # CRITICAL: Only remove from queue AFTER successful DB insert
             # This prevents data loss if DB fails
             items_to_remove = len(items)  # Total items peeked (including failed parses)
-            remove_success = await redis_queue.remove_first(items_to_remove)
+            remove_success = await queue.remove_first(items_to_remove)
             if remove_success:
                 logger.debug(f"Removed {items_to_remove} items from queue after successful DB insert")
                 track_queue_operation(QueueOperation.DEQUEUE, "batch_processor")
@@ -141,7 +142,7 @@ async def process_batch_from_queue(
                     f"Items will be reprocessed on next run (duplicate inserts will be ignored)"
                 )
 
-            remaining_size = await redis_queue.size()
+            remaining_size = await queue.size()
             update_queue_size(remaining_size, "batch_processor")
 
             total_duration_ms = (time.time() - start_time) * 1000
@@ -178,7 +179,7 @@ async def process_batch_from_queue(
         request_context.clear_request_id()
 
 
-async def background_batch_processor(url_repo: URLRepository, redis_queue):
+async def background_batch_processor(url_repo: URLRepository, queue: Queue):
     """
     Background task that processes batch queue periodically.
 
@@ -187,7 +188,7 @@ async def background_batch_processor(url_repo: URLRepository, redis_queue):
 
     Args:
         url_repo: URL repository for database operations
-        redis_queue: Redis queue instance
+        queue: Queue instance (Redis or other implementation)
     """
     logger.info(f"Background scheduler started (interval={settings.batch_interval_seconds}s)")
 
@@ -195,11 +196,11 @@ async def background_batch_processor(url_repo: URLRepository, redis_queue):
         try:
             await asyncio.sleep(settings.batch_interval_seconds)
 
-            if not redis_queue:
+            if not queue:
                 continue
 
             # Process batch
-            await process_batch_from_queue(url_repo, redis_queue)
+            await process_batch_from_queue(url_repo, queue)
 
         except asyncio.CancelledError:
             logger.info("Background scheduler cancelled gracefully")

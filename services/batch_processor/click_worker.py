@@ -17,6 +17,7 @@ from shared.data.interfaces.click_repository import ClickRepository
 from shared.core.schemas import ClickData
 from shared.core.queue_messages import ClickQueueMessage
 from shared.utils import request_context
+from shared.utils.interfaces.queue import Queue
 from shared.middleware.metrics import (
     track_queue_operation,
     track_db_operation,
@@ -62,7 +63,7 @@ class ClickBatchResult:
 
 async def process_click_batch_from_queue(
     click_repo: ClickRepository,
-    redis_queue,
+    queue: Queue,
     batch_size: int = None
 ) -> ClickBatchResult:
     """
@@ -70,7 +71,7 @@ async def process_click_batch_from_queue(
 
     Args:
         click_repo: Click repository for database operations
-        redis_queue: Redis queue instance
+        queue: Queue instance (Redis or other implementation)
         batch_size: Maximum number of clicks to process (defaults to settings)
 
     Returns:
@@ -84,7 +85,7 @@ async def process_click_batch_from_queue(
     request_context.set_request_id(f"click-batch-{batch_id}")
 
     try:
-        queue_size = await redis_queue.size()
+        queue_size = await queue.size()
         update_queue_size(queue_size, "click_analytics")
 
         if queue_size == 0:
@@ -103,7 +104,7 @@ async def process_click_batch_from_queue(
         start_time = time.time()
 
         # Peek at items WITHOUT removing (prevents data loss on DB failure)
-        items = await redis_queue.peek(count=batch_size)
+        items = await queue.peek(count=batch_size)
 
         if not items:
             return ClickBatchResult(
@@ -148,7 +149,7 @@ async def process_click_batch_from_queue(
                 f"All items failed to parse: batch_id={batch_id} | "
                 f"total_items={len(items)} | failed={failed_parse_count}"
             )
-            remaining_size = await redis_queue.size()
+            remaining_size = await queue.size()
             return ClickBatchResult(
                 batch_id=batch_id,
                 processed=0,
@@ -172,7 +173,7 @@ async def process_click_batch_from_queue(
             # CRITICAL: Only remove from queue AFTER successful DB insert
             # This prevents data loss if DB fails
             items_to_remove = len(items)  # Total items peeked (including failed parses)
-            remove_success = await redis_queue.remove_first(items_to_remove)
+            remove_success = await queue.remove_first(items_to_remove)
             if remove_success:
                 logger.debug(f"Removed {items_to_remove} click items from queue after successful DB insert")
                 track_queue_operation(QueueOperation.DEQUEUE, "click_analytics")
@@ -182,7 +183,7 @@ async def process_click_batch_from_queue(
                     f"Items will be reprocessed on next run (duplicate inserts will be ignored)"
                 )
 
-            remaining_size = await redis_queue.size()
+            remaining_size = await queue.size()
             update_queue_size(remaining_size, "click_analytics")
 
             total_duration_ms = (time.time() - start_time) * 1000
@@ -226,7 +227,7 @@ async def process_click_batch_from_queue(
 
 async def background_click_batch_processor(
     click_repo: ClickRepository,
-    redis_queue,
+    queue: Queue,
     interval_seconds: int = None
 ) -> None:
     """
@@ -239,7 +240,7 @@ async def background_click_batch_processor(
 
     Args:
         click_repo: Click repository for database operations
-        redis_queue: Redis queue instance
+        queue: Queue instance (Redis or other implementation)
         interval_seconds: Seconds to wait between batch processing (defaults to settings.click_batch_interval_seconds)
     """
     if interval_seconds is None:
@@ -253,7 +254,7 @@ async def background_click_batch_processor(
     while True:
         try:
             await asyncio.sleep(interval_seconds)
-            await process_click_batch_from_queue(click_repo, redis_queue)
+            await process_click_batch_from_queue(click_repo, queue)
 
         except asyncio.CancelledError:
             logger.info("Click analytics background scheduler cancelled gracefully")
