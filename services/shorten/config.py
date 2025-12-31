@@ -46,7 +46,6 @@ class ShortenServiceSettings(BaseSettings):
     log_level: str = "DEBUG"
 
     # Cache Configuration (REQUIRED - caches created URLs)
-    cache_enabled: bool = True
     cache_max_size: int = 1000
     cache_ttl_seconds: int = 3600
 

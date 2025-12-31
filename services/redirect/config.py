@@ -30,7 +30,6 @@ class RedirectServiceSettings(BaseSettings):
     log_level: str = "DEBUG"
 
     # Cache Configuration (REQUIRED - caches URL lookups)
-    cache_enabled: bool = True
     cache_max_size: int = 1000
     cache_ttl_seconds: int = 3600
 

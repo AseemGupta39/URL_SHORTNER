@@ -84,8 +84,7 @@ services:
       # CORS
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500
 
-      # Cache
-      - CACHE_ENABLED=true
+      # Cache (always enabled)
       - CACHE_MAX_SIZE=1000
       - CACHE_TTL_SECONDS=3600
 
@@ -135,8 +134,7 @@ services:
       # CORS
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500
 
-      # Cache
-      - CACHE_ENABLED=true
+      # Cache (always enabled)
       - CACHE_MAX_SIZE=1000
       - CACHE_TTL_SECONDS=3600
 
