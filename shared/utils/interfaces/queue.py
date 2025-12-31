@@ -55,3 +55,29 @@ class Queue(ABC):
     async def clear(self) -> bool:
         """Clear all items from queue."""
         pass
+
+    @abstractmethod
+    async def peek(self, count: int = 1) -> List[Dict[str, Any]]:
+        """
+        Peek at items without removing them from queue.
+
+        Args:
+            count: Number of items to peek at
+
+        Returns:
+            List of dictionaries (items remain in queue)
+        """
+        pass
+
+    @abstractmethod
+    async def remove_first(self, count: int) -> bool:
+        """
+        Remove first N items from queue.
+
+        Args:
+            count: Number of items to remove from front
+
+        Returns:
+            True if successful, False otherwise
+        """
+        pass

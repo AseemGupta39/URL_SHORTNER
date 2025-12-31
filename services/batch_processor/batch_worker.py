@@ -29,7 +29,7 @@ settings = get_settings()
 
 async def process_batch_from_queue(
     url_repo: URLRepository,
-    redis_queue,
+    redis_queue, # why not queue :Queue here 
     batch_size: int = None
 ) -> dict:
     """
@@ -68,8 +68,9 @@ async def process_batch_from_queue(
         logger.info(f"Starting batch processing: batch_id={batch_id} | queue_size={queue_size}")
 
         start_time = time.time()
-        items = await redis_queue.dequeue(count=batch_size)
-        track_queue_operation(QueueOperation.DEQUEUE, "batch_processor")
+
+        # Peek at items WITHOUT removing (prevents data loss on DB failure)
+        items = await redis_queue.peek(count=batch_size)
 
         if not items:
             return {
@@ -126,6 +127,19 @@ async def process_batch_from_queue(
 
             # Track DB operation with timing
             track_db_operation(DBOperation.BATCH_WRITE, db_duration_seconds, "batch_processor")
+
+            # CRITICAL: Only remove from queue AFTER successful DB insert
+            # This prevents data loss if DB fails
+            items_to_remove = len(items)  # Total items peeked (including failed parses)
+            remove_success = await redis_queue.remove_first(items_to_remove)
+            if remove_success:
+                logger.debug(f"Removed {items_to_remove} items from queue after successful DB insert")
+                track_queue_operation(QueueOperation.DEQUEUE, "batch_processor")
+            else:
+                logger.error(
+                    f"Failed to remove items from queue after DB insert | "
+                    f"Items will be reprocessed on next run (duplicate inserts will be ignored)"
+                )
 
             remaining_size = await redis_queue.size()
             update_queue_size(remaining_size, "batch_processor")

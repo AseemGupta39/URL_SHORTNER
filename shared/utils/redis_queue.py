@@ -154,6 +154,59 @@ class RedisQueue(Queue):
             logger.error(f"RedisQueue clear error: {e}")
             return False
 
+    async def peek(self, count: int = 1) -> List[Dict[str, Any]]:
+        """
+        Peek at items without removing them from queue.
+
+        Uses LRANGE to read items without removing (safe for data loss prevention).
+
+        Args:
+            count: Number of items to peek at
+
+        Returns:
+            List of dictionaries (items remain in queue)
+        """
+        if not self._client:
+            logger.warning("RedisQueue not connected")
+            return []
+
+        try:
+            # LRANGE 0 (count-1) gets first 'count' items without removing
+            results = await self._client.lrange(self.queue_name, 0, count - 1)
+            if results:
+                return [json.loads(item) for item in results]
+            return []
+
+        except Exception as e:
+            logger.error(f"RedisQueue peek error: {e}")
+            return []
+
+    async def remove_first(self, count: int) -> bool:
+        """
+        Remove first N items from queue.
+
+        Uses LTRIM to remove items AFTER successful processing.
+
+        Args:
+            count: Number of items to remove from front
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._client:
+            logger.warning("RedisQueue not connected")
+            return False
+
+        try:
+            # LTRIM count -1 removes first 'count' items (keeps from index 'count' onwards)
+            await self._client.ltrim(self.queue_name, count, -1)
+            logger.debug(f"Removed first {count} items from {self.queue_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"RedisQueue remove_first error: {e}")
+            return False
+
 
 _redis_queue: Optional[RedisQueue] = None
 
