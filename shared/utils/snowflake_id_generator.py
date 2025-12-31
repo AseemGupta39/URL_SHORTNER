@@ -94,10 +94,15 @@ class SnowflakeIDGenerator(IDGenerator):
         """Get current timestamp in seconds"""
         return int(time.time())
 
-    def _wait_next_second(self, last_timestamp: int) -> int:
-        """Wait until next second"""
+    async def _wait_next_second(self, last_timestamp: int) -> int:
+        """
+        Wait until next second (async, non-blocking).
+
+        Uses asyncio.sleep() to prevent blocking the event loop during wait.
+        """
         timestamp = self._current_timestamp_sec()
         while timestamp <= last_timestamp:
+            await asyncio.sleep(0.001)  # Sleep 1ms to avoid busy-wait blocking
             timestamp = self._current_timestamp_sec()
         return timestamp
 
@@ -134,7 +139,7 @@ class SnowflakeIDGenerator(IDGenerator):
                     logger.warning(
                         f"Sequence exhausted ({self.max_sequence + 1} IDs/sec), waiting for next second"
                     )
-                    timestamp = self._wait_next_second(self.last_timestamp)
+                    timestamp = await self._wait_next_second(self.last_timestamp)
             else:
                 # New second - reset sequence
                 self.sequence = 0
