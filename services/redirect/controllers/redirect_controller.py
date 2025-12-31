@@ -6,6 +6,7 @@ Handles HTTP routes for URL redirection operations.
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse as FastAPIRedirect
 import logging
+import re
 
 from shared.core.services import URLService
 from shared.core.services.click_analytics_service import ClickAnalyticsService
@@ -14,6 +15,9 @@ from shared.core.exceptions import ShortCodeNotFoundException
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Short code validation pattern: exactly 8 alphanumeric characters (Base62)
+SHORT_CODE_PATTERN = re.compile(r'^[A-Za-z0-9]{8}$')
 
 
 @router.get("/{short_code}", tags=["Redirect"])
@@ -27,10 +31,20 @@ async def redirect_url(
     Redirect to original URL using short code and track click analytics.
 
     Returns 302 redirect to original URL.
+    Raises 400 if short code format is invalid.
     Raises 404 if short code not found.
 
     Click tracking is fail-open: redirect works even if tracking fails.
     """
+    # Validate short code format BEFORE any processing
+    # Prevents cache pollution, path traversal, and DoS attacks
+    if not SHORT_CODE_PATTERN.match(short_code):
+        logger.warning(f"Invalid short code format rejected: {short_code}")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid short code format. Must be exactly 8 alphanumeric characters."
+        )
+
     try:
         logger.info(f"Resolving short code: {short_code}")
         result = await url_service.resolve(short_code)
