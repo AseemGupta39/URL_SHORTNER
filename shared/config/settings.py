@@ -61,8 +61,13 @@ class Settings(BaseSettings):
     # Each service gets its own connection pool (singleton pattern in dependencies.py)
     # Pool size should match expected concurrent requests per service
     redis_pool_max_connections: int = 50  # Max connections in pool (tune based on load)
-    redis_socket_timeout: int = 5  # Socket operation timeout in seconds
-    redis_socket_connect_timeout: int = 5  # Connection timeout in seconds
+
+    # Redis Timeout Configuration
+    # Different timeouts for cache vs queue operations (cache is non-critical, queue is important)
+    redis_cache_socket_timeout: int = 1  # Cache read/write timeout (fail fast, cache miss is ok)
+    redis_cache_connect_timeout: int = 1  # Cache connection timeout
+    redis_queue_socket_timeout: int = 3  # Queue read/write timeout (try harder, queue is important)
+    redis_queue_connect_timeout: int = 2  # Queue connection timeout
 
     # Queue Configuration
     queue_enabled: bool = False  # Enable async batch processing

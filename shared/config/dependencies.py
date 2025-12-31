@@ -78,8 +78,8 @@ async def get_cache() -> Cache:
                 redis_url=settings.redis_url,
                 ttl_seconds=settings.cache_ttl_seconds,
                 max_connections=settings.redis_pool_max_connections,
-                socket_timeout=settings.redis_socket_timeout,
-                socket_connect_timeout=settings.redis_socket_connect_timeout
+                socket_timeout=settings.redis_cache_socket_timeout,
+                socket_connect_timeout=settings.redis_cache_connect_timeout
             )
             await _cache_instance.connect()
         else:
@@ -116,8 +116,8 @@ async def get_queue() -> Queue:
             _queue_instance = RedisQueue(
                 redis_url=settings.redis_url,
                 max_connections=settings.redis_pool_max_connections,
-                socket_timeout=settings.redis_socket_timeout,
-                socket_connect_timeout=settings.redis_socket_connect_timeout
+                socket_timeout=settings.redis_queue_socket_timeout,
+                socket_connect_timeout=settings.redis_queue_connect_timeout
             )
             await _queue_instance.connect()
         else:

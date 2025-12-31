@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import HttpUrl
 import logging
+import asyncio
 
 from shared.core.schemas import URLData, ShortenResponse, RedirectResponse
 from shared.core.queue_messages import URLQueueMessage
@@ -95,26 +96,46 @@ class URLService:
                 created_at=datetime.now()
             )
 
-            # Write to cache first for immediate availability
-            cache_success = await self.cache.set_async(short_code, url_data)
-
-            if cache_success:
-                logger.debug(f"Cache WRITE successful: short_code={short_code}")
-                track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
-            else:
-                logger.error(f"Cache WRITE failed: short_code={short_code}", exc_info=True)
-                track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
-                # Continue even if cache fails - queue will persist to DB
-
-            # Queue for batch insert with graceful degradation
+            # Concurrent cache + queue writes for optimal latency
+            # Sequential: cache (1s timeout) + queue (3s timeout) = 4s worst case
+            # Concurrent: max(1s, 3s) = 3s worst case (25% faster!)
             queue_msg = URLQueueMessage.from_url_data(
                 short_code=url_data.short_code,
                 original_url=url_data.original_url,
                 created_at=url_data.created_at
             )
-            queue_success = await self.queue.enqueue(queue_msg.to_dict())
 
-            if queue_success:
+            # Create tasks for parallel execution (same thread, interleaved by event loop)
+            cache_task = asyncio.create_task(self.cache.set_async(short_code, url_data))
+            queue_task = asyncio.create_task(self.queue.enqueue(queue_msg.to_dict()))
+
+            # Execute both concurrently, handle exceptions gracefully
+            results = await asyncio.gather(cache_task, queue_task, return_exceptions=True)
+            cache_success, queue_success = results[0], results[1]
+
+            # Handle cache result
+            if isinstance(cache_success, Exception):
+                logger.error(
+                    f"Cache WRITE raised exception: short_code={short_code} | error={cache_success}",
+                    exc_info=True
+                )
+                track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
+                cache_success = False
+            elif cache_success:
+                logger.debug(f"Cache WRITE successful: short_code={short_code}")
+                track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
+            else:
+                logger.error(f"Cache WRITE failed: short_code={short_code}", exc_info=True)
+                track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
+
+            # Handle queue result
+            if isinstance(queue_success, Exception):
+                logger.error(
+                    f"Queue ENQUEUE raised exception: short_code={short_code} | error={queue_success}",
+                    exc_info=True
+                )
+                queue_success = False
+            elif queue_success:
                 logger.debug(f"Queue ENQUEUE successful: short_code={short_code}")
                 track_queue_operation(QueueOperation.ENQUEUE, self.service_name)
             else:
