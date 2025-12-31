@@ -54,10 +54,9 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue
+      # Redis & Queue (queue is always enabled - just set REDIS_URL)
       - REDIS_URL=redis://redis:6379
       - REDIS_ENABLED=true
-      - QUEUE_ENABLED=true
 
       # Redis Connection Pooling
       - REDIS_POOL_MAX_CONNECTIONS=100
@@ -119,10 +118,9 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue
+      # Redis & Queue (queue is always enabled - just set REDIS_URL)
       - REDIS_URL=redis://redis:6379
       - REDIS_ENABLED=true
-      - QUEUE_ENABLED=true
 
       # Redis Connection Pooling
       - REDIS_POOL_MAX_CONNECTIONS=100
@@ -171,10 +169,9 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue
+      # Redis & Queue (queue is always enabled - just set REDIS_URL)
       - REDIS_URL=redis://redis:6379
       - REDIS_ENABLED=true
-      - QUEUE_ENABLED=true
       - BATCH_SIZE=100
       - BATCH_INTERVAL_SECONDS=100
       - ENABLE_BACKGROUND_SCHEDULER=true

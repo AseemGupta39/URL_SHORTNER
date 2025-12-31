@@ -70,8 +70,7 @@ class Settings(BaseSettings):
     redis_queue_socket_timeout: int = 3  # Queue read/write timeout (try harder, queue is important)
     redis_queue_connect_timeout: int = 2  # Queue connection timeout
 
-    # Queue Configuration
-    queue_enabled: bool = False  # Enable async batch processing
+    # Queue Configuration (REQUIRED - Redis queue is fundamental to architecture)
     batch_size: int = 100  # Number of URLs to batch insert at once
     batch_interval_seconds: int = 10  # Process queue every N seconds
     enable_background_scheduler: bool = False  # Background processing (set True in local .env for dev)

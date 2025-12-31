@@ -177,10 +177,9 @@ async def startup_event():
     # Get repository instance (will be initialized by singleton on first call)
     url_repo = await get_url_repository()
 
-    # Initialize queue if enabled
-    if settings.queue_enabled:
-        redis_queue = get_redis_queue(settings.redis_url)
-        await redis_queue.connect()
+    # Initialize queue (always required for batch processor)
+    redis_queue = get_redis_queue(settings.redis_url)
+    await redis_queue.connect()
 
     # Pass dependencies to controller
     set_dependencies(url_repo, redis_queue)

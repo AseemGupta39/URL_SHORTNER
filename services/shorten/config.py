@@ -4,6 +4,7 @@ This service creates short URLs with unique IDs.
 Port: 8001
 """
 from pydantic_settings import BaseSettings
+from pydantic import field_validator, model_validator
 
 
 class ShortenServiceSettings(BaseSettings):
@@ -57,7 +58,6 @@ class ShortenServiceSettings(BaseSettings):
     redis_socket_connect_timeout: int = 5
 
     # Queue Configuration (REQUIRED - enqueues URLs for batch insert)
-    queue_enabled: bool = False
     batch_size: int = 100
     batch_interval_seconds: int = 10
     enable_background_scheduler: bool = False

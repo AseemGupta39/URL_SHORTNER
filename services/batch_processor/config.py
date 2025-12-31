@@ -37,7 +37,6 @@ class BatchProcessorServiceSettings(BaseSettings):
     redis_socket_connect_timeout: int = 5
 
     # Queue Configuration (REQUIRED - processes queued URLs)
-    queue_enabled: bool = False
     batch_size: int = 100
     batch_interval_seconds: int = 10
     enable_background_scheduler: bool = True  # True for local dev, False for production (use cron)

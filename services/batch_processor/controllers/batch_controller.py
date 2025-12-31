@@ -38,7 +38,7 @@ async def ensure_queue_initialized():
     """Ensure Redis queue is initialized (lazy initialization for serverless)."""
     global redis_queue
 
-    if redis_queue is None and settings.queue_enabled:
+    if redis_queue is None:
         logger.info("Lazy-initializing Redis queue for serverless environment")
         redis_queue = get_redis_queue(settings.redis_url)
         await redis_queue.connect()
@@ -68,24 +68,6 @@ async def get_status():
     Returns queue size, configuration, and last processing stats.
     """
     try:
-        # Debug info about queue_enabled
-        import os
-        queue_enabled_env = os.getenv("QUEUE_ENABLED", "not set")
-
-        if not settings.queue_enabled:
-            return {
-                "status": "disabled",
-                "message": "Queue is not enabled",
-                "queue_size": 0,
-                "config": {
-                    "queue_enabled": False,
-                    "queue_enabled_env_value": queue_enabled_env,
-                    "queue_enabled_type": str(type(settings.queue_enabled)),
-                    "batch_size": settings.batch_size,
-                    "batch_interval_seconds": settings.batch_interval_seconds
-                }
-            }
-
         # Lazy-initialize queue for serverless
         queue = await ensure_queue_initialized()
 
@@ -95,7 +77,6 @@ async def get_status():
                 "message": "Failed to initialize Redis queue",
                 "queue_size": 0,
                 "debug": {
-                    "queue_enabled": settings.queue_enabled,
                     "redis_url_set": bool(settings.redis_url)
                 }
             }
@@ -105,7 +86,6 @@ async def get_status():
         return {
             "status": "healthy",
             "service": "batch_processor",
-            "queue_enabled": settings.queue_enabled,
             "queue_size": queue_size,
             "config": {
                 "batch_size": settings.batch_size,

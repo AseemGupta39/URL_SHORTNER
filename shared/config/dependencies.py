@@ -144,18 +144,22 @@ async def get_url_queue() -> Queue:
         async with _url_queue_lock:
             # Double-check: another coroutine may have initialized while we waited
             if _url_queue_instance is None:
-                if settings.queue_enabled and settings.redis_url:
-                    logger.info("Initializing URL Queue (url_batch_queue)")
-                    _url_queue_instance = RedisQueue(
-                        redis_url=settings.redis_url,
-                        queue_name="url_batch_queue",
-                        max_connections=settings.redis_pool_max_connections,
-                        socket_timeout=settings.redis_queue_socket_timeout,
-                        socket_connect_timeout=settings.redis_queue_connect_timeout
+                if not settings.redis_url:
+                    raise RuntimeError(
+                        "Redis queue is required for async batch processing architecture. "
+                        "Please set REDIS_URL in your .env file. "
+                        "Example: REDIS_URL=redis://localhost:6379"
                     )
-                    await _url_queue_instance.connect()
-                else:
-                    raise RuntimeError("Queue is required but not enabled in settings")
+
+                logger.info("Initializing URL Queue (url_batch_queue)")
+                _url_queue_instance = RedisQueue(
+                    redis_url=settings.redis_url,
+                    queue_name="url_batch_queue",
+                    max_connections=settings.redis_pool_max_connections,
+                    socket_timeout=settings.redis_queue_socket_timeout,
+                    socket_connect_timeout=settings.redis_queue_connect_timeout
+                )
+                await _url_queue_instance.connect()
 
     return _url_queue_instance
 
@@ -191,18 +195,22 @@ async def get_click_queue() -> Queue:
         async with _click_queue_lock:
             # Double-check: another coroutine may have initialized while we waited
             if _click_queue_instance is None:
-                if settings.queue_enabled and settings.redis_url:
-                    logger.info("Initializing Click Queue (click_batch_queue)")
-                    _click_queue_instance = RedisQueue(
-                        redis_url=settings.redis_url,
-                        queue_name="click_batch_queue",
-                        max_connections=settings.redis_pool_max_connections,
-                        socket_timeout=settings.redis_queue_socket_timeout,
-                        socket_connect_timeout=settings.redis_queue_connect_timeout
+                if not settings.redis_url:
+                    raise RuntimeError(
+                        "Redis queue is required for click analytics architecture. "
+                        "Please set REDIS_URL in your .env file. "
+                        "Example: REDIS_URL=redis://localhost:6379"
                     )
-                    await _click_queue_instance.connect()
-                else:
-                    raise RuntimeError("Queue is required but not enabled in settings")
+
+                logger.info("Initializing Click Queue (click_batch_queue)")
+                _click_queue_instance = RedisQueue(
+                    redis_url=settings.redis_url,
+                    queue_name="click_batch_queue",
+                    max_connections=settings.redis_pool_max_connections,
+                    socket_timeout=settings.redis_queue_socket_timeout,
+                    socket_connect_timeout=settings.redis_queue_connect_timeout
+                )
+                await _click_queue_instance.connect()
 
     return _click_queue_instance
 
