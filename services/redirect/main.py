@@ -24,8 +24,8 @@ from services.redirect.config import settings  # Service-specific settings
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
-from shared.config.dependencies import get_url_repository, get_cache
-from shared.utils.health import check_database, check_redis, check_all_dependencies
+from shared.config.dependencies import get_url_repository, get_cache, get_click_queue
+from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
 from services.redirect.controllers import redirect_router
 
 # Setup per-service logging
@@ -79,7 +79,7 @@ async def health_check():
 async def full_health_check():
     """
     Comprehensive health check including all dependencies.
-    Checks database and Redis connectivity.
+    Checks database, Redis cache, and queue connectivity.
     """
     try:
         repository = await get_url_repository()
@@ -93,10 +93,18 @@ async def full_health_check():
         cache = None
         logger.error(f"Failed to get cache for health check: {e}")
 
+    try:
+        # Check click queue (redirect service uses it for analytics)
+        queue = await get_click_queue()
+    except Exception as e:
+        queue = None
+        logger.error(f"Failed to get click queue for health check: {e}")
+
     result = await check_all_dependencies(
         service_name="redirect",
         repository=repository,
-        cache=cache
+        cache=cache,
+        queue=queue
     )
     return result
 
@@ -130,6 +138,23 @@ async def redis_health_check():
         result = DependencyHealth(
             status="unhealthy",
             message="Failed to initialize Redis connection",
+            error=str(e)
+        )
+    return result
+
+
+@app.get("/health/queue")
+async def queue_health_check():
+    """Check Redis queue connectivity and performance."""
+    try:
+        queue = await get_click_queue()
+        result = await check_queue(queue)
+    except Exception as e:
+        logger.error(f"Failed to get queue for health check: {e}")
+        from shared.utils.health import DependencyHealth
+        result = DependencyHealth(
+            status="unhealthy",
+            message="Failed to initialize queue connection",
             error=str(e)
         )
     return result

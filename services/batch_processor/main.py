@@ -22,10 +22,10 @@ from services.batch_processor.config import get_settings  # Service-specific set
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
-from shared.config.dependencies import get_url_repository, get_cache
+from shared.config.dependencies import get_url_repository, get_cache, get_url_queue, get_click_queue
 from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
-from shared.utils.health import check_database, check_redis, check_all_dependencies
+from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
 from services.batch_processor.controllers import batch_router, set_dependencies
 from services.batch_processor.batch_worker import background_batch_processor
 
@@ -70,7 +70,7 @@ async def health_check():
 async def full_health_check():
     """
     Comprehensive health check including all dependencies.
-    Checks database and Redis connectivity.
+    Checks database, Redis cache, and queues connectivity.
     """
     try:
         repository = await get_url_repository()
@@ -84,10 +84,18 @@ async def full_health_check():
         cache = None
         logger.error(f"Failed to get cache for health check: {e}")
 
+    try:
+        # Check URL queue (batch processor uses it)
+        queue = await get_url_queue()
+    except Exception as e:
+        queue = None
+        logger.error(f"Failed to get URL queue for health check: {e}")
+
     result = await check_all_dependencies(
         service_name="batch_processor",
         repository=repository,
-        cache=cache
+        cache=cache,
+        queue=queue
     )
     return result
 
@@ -121,6 +129,23 @@ async def redis_health_check():
         result = DependencyHealth(
             status="unhealthy",
             message="Failed to initialize Redis connection",
+            error=str(e)
+        )
+    return result
+
+
+@app.get("/health/queue")
+async def queue_health_check():
+    """Check Redis queue connectivity and performance."""
+    try:
+        queue = await get_url_queue()
+        result = await check_queue(queue)
+    except Exception as e:
+        logger.error(f"Failed to get queue for health check: {e}")
+        from shared.utils.health import DependencyHealth
+        result = DependencyHealth(
+            status="unhealthy",
+            message="Failed to initialize queue connection",
             error=str(e)
         )
     return result

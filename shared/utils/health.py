@@ -10,6 +10,8 @@ import logging
 from shared.data.repositories.sqlite_url_repository import SQLiteURLRepository
 from shared.utils.interfaces.cache import Cache
 from shared.utils.redis_cache import RedisCache
+from shared.utils.interfaces.queue import Queue
+from shared.utils.redis_queue import RedisQueue
 
 logger = logging.getLogger(__name__)
 
@@ -146,10 +148,69 @@ async def check_redis(cache: Cache) -> DependencyHealth:
         )
 
 
+async def check_queue(queue: Queue) -> DependencyHealth:
+    """
+    Check Redis queue connectivity and performance.
+
+    Args:
+        queue: Queue instance (RedisQueue)
+
+    Returns:
+        DependencyHealth with connection status and response time
+    """
+    start_time = datetime.utcnow()
+
+    # If not using RedisQueue, return N/A status
+    if not isinstance(queue, RedisQueue):
+        return DependencyHealth(
+            status="not_applicable",
+            message="Redis queue not enabled",
+            details={"queue_type": "none"}
+        )
+
+    try:
+        # Test queue connection by getting size
+        if queue._client:
+            queue_size = await queue.size()
+
+            response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+
+            return DependencyHealth(
+                status="healthy",
+                response_time_ms=round(response_time_ms, 2),
+                message="Redis queue connection successful",
+                details={
+                    "queue_type": "redis",
+                    "queue_name": queue.queue_name,
+                    "queue_size": queue_size
+                }
+            )
+        else:
+            return DependencyHealth(
+                status="unhealthy",
+                message="Redis queue client not initialized",
+                error="Redis queue client not connected",
+                details={"queue_type": "redis", "queue_name": queue.queue_name}
+            )
+
+    except Exception as e:
+        response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        logger.error(f"Redis queue health check failed: {e}")
+
+        return DependencyHealth(
+            status="unhealthy",
+            response_time_ms=round(response_time_ms, 2),
+            message="Redis queue connection failed",
+            error=str(e),
+            details={"queue_type": "redis", "queue_name": getattr(queue, "queue_name", "unknown")}
+        )
+
+
 async def check_all_dependencies(
     service_name: str,
     repository: Optional[SQLiteURLRepository] = None,
-    cache: Optional[Cache] = None
+    cache: Optional[Cache] = None,
+    queue: Optional[Queue] = None
 ) -> ServiceHealth:
     """
     Check health of all service dependencies.
@@ -158,6 +219,7 @@ async def check_all_dependencies(
         service_name: Name of the service (shorten, redirect, batch)
         repository: URL repository instance (optional)
         cache: Cache instance (optional)
+        queue: Queue instance (optional)
 
     Returns:
         ServiceHealth with comprehensive status for all dependencies
@@ -172,6 +234,10 @@ async def check_all_dependencies(
     # Check Redis if cache is provided
     if cache:
         dependencies["redis"] = await check_redis(cache)
+
+    # Check queue if queue is provided
+    if queue:
+        dependencies["queue"] = await check_queue(queue)
 
     # Calculate total response time
     total_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
