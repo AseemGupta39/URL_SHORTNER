@@ -49,7 +49,7 @@ async def process_batch_from_queue(
 
     # Generate unique batch ID for tracking
     batch_id = str(uuid.uuid4())[:12]
-    request_context.set_request_id(f"batch-{batch_id}")
+    request_context.set_batch_id(f"batch-{batch_id}")
 
     try:
         queue_size = await queue.size()
@@ -90,6 +90,13 @@ async def process_batch_from_queue(
         for item in items:
             try:
                 msg = URLQueueMessage(**item)
+
+                # Log individual item with original request_id for end-to-end traceability
+                logger.debug(
+                    f"Processing queued URL: short_code={msg.short_code} | "
+                    f"original_request_id={msg.request_id}"
+                )
+
                 url_data = URLData(
                     short_code=msg.short_code,
                     original_url=msg.original_url,
@@ -99,7 +106,8 @@ async def process_batch_from_queue(
             except Exception as e:
                 failed_parse_count += 1
                 logger.error(
-                    f"Failed to parse queue message: error={str(e)} | item={item}",
+                    f"Failed to parse queue message: error={str(e)} | "
+                    f"request_id={item.get('request_id', 'unknown')} | item={item}",
                     exc_info=True
                 )
                 continue
@@ -176,7 +184,7 @@ async def process_batch_from_queue(
             raise
 
     finally:
-        request_context.clear_request_id()
+        request_context.clear_batch_id()
 
 
 async def background_batch_processor(url_repo: URLRepository, queue: Queue):

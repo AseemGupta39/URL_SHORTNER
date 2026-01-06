@@ -11,14 +11,23 @@ class URLQueueMessage(BaseModel):
     short_code: str
     original_url: str
     created_at: str  # ISO format timestamp
+    request_id: str  # Required for end-to-end traceability (auto-captured from context)
 
     @classmethod
     def from_url_data(cls, short_code: str, original_url: str, created_at: datetime):
-        """Create queue message from URL data."""
+        """
+        Create queue message from URL data.
+
+        Automatically captures request_id from context for end-to-end traceability.
+        The request_id survives in the queue and can be restored by batch workers.
+        """
+        from shared.utils import request_context
+
         return cls(
             short_code=short_code,
             original_url=original_url,
-            created_at=created_at.isoformat()
+            created_at=created_at.isoformat(),
+            request_id=request_context.get_request_id()
         )
 
     def to_dict(self) -> dict:
@@ -26,7 +35,8 @@ class URLQueueMessage(BaseModel):
         return {
             "short_code": self.short_code,
             "original_url": self.original_url,
-            "created_at": self.created_at
+            "created_at": self.created_at,
+            "request_id": self.request_id
         }
 
 
@@ -38,6 +48,7 @@ class ClickQueueMessage(BaseModel):
     ip_address: str
     user_agent: str
     referrer: Optional[str] = None
+    request_id: str  # Required for end-to-end traceability (auto-captured from context)
 
     @classmethod
     def from_click_data(
@@ -49,14 +60,22 @@ class ClickQueueMessage(BaseModel):
         user_agent: str,
         referrer: Optional[str] = None
     ):
-        """Create queue message from click data."""
+        """
+        Create queue message from click data.
+
+        Automatically captures request_id from context for end-to-end traceability.
+        The request_id survives in the queue and can be restored by batch workers.
+        """
+        from shared.utils import request_context
+
         return cls(
             short_code=short_code,
             original_url=original_url,
             clicked_at=clicked_at.isoformat(),
             ip_address=ip_address,
             user_agent=user_agent,
-            referrer=referrer
+            referrer=referrer,
+            request_id=request_context.get_request_id()
         )
 
     def to_dict(self) -> dict:
@@ -67,5 +86,6 @@ class ClickQueueMessage(BaseModel):
             "clicked_at": self.clicked_at,
             "ip_address": self.ip_address,
             "user_agent": self.user_agent,
-            "referrer": self.referrer
+            "referrer": self.referrer,
+            "request_id": self.request_id
         }

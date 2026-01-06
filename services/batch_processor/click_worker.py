@@ -82,7 +82,7 @@ async def process_click_batch_from_queue(
 
     # Generate unique batch ID for tracking (logged automatically via request_context)
     batch_id = str(uuid.uuid4())[:12]
-    request_context.set_request_id(f"click-batch-{batch_id}")
+    request_context.set_batch_id(f"click-batch-{batch_id}")
 
     try:
         queue_size = await queue.size()
@@ -125,6 +125,12 @@ async def process_click_batch_from_queue(
                 # Parse queue message
                 msg = ClickQueueMessage(**item)
 
+                # Log individual item with original request_id for end-to-end traceability
+                logger.debug(
+                    f"Processing queued click: short_code={msg.short_code} | "
+                    f"original_request_id={msg.request_id}"
+                )
+
                 # Convert to ClickData (domain model)
                 click_data = ClickData(
                     short_code=msg.short_code,
@@ -139,7 +145,8 @@ async def process_click_batch_from_queue(
             except Exception as e:
                 failed_parse_count += 1
                 logger.error(
-                    f"Failed to parse click queue message: batch_id={batch_id} | error={str(e)}",
+                    f"Failed to parse click queue message: error={str(e)} | "
+                    f"request_id={item.get('request_id', 'unknown')}",
                     exc_info=True
                 )
                 # Continue processing other items
@@ -221,8 +228,8 @@ async def process_click_batch_from_queue(
         )
         raise
     finally:
-        # Clear request context for explicit lifecycle management
-        request_context.clear_request_id()
+        # Clear batch context for explicit lifecycle management
+        request_context.clear_batch_id()
 
 
 async def background_click_batch_processor(

@@ -26,7 +26,7 @@ def _context_aware_log_record(*args, **kwargs):
     """
     Custom LogRecord factory that automatically adds context variables to log records.
 
-    This makes context data (like request_id, user_id, etc.) available in all log messages
+    This makes context data (like request_id, batch_id, etc.) available in all log messages
     without needing to pass them manually or use filters.
 
     Extensible: Just add more context getters here as needed.
@@ -35,11 +35,16 @@ def _context_aware_log_record(*args, **kwargs):
 
     # Add request ID from context
     try:
-        from shared.utils.request_context import get_request_id
+        from shared.utils.request_context import get_request_id, get_batch_id
+
         request_id = get_request_id()
         record.request_id = request_id if request_id else "-"
+
+        batch_id = get_batch_id()
+        record.batch_id = batch_id if batch_id else "-"
     except (ImportError, Exception):
         record.request_id = "-"
+        record.batch_id = "-"
 
     # Future: Add more context variables here as needed
     # record.user_id = get_user_id() or "-"
@@ -95,8 +100,8 @@ def setup_logging(
     if json_format:
         log_format = _get_json_format()
     else:
-        # Standard format: timestamp [level] [request_id] [module:line:function] message
-        log_format = "%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s"
+        # Standard format: timestamp [level] [request_id] [batch_id] [module:line:function] message
+        log_format = "%(asctime)s [%(levelname)s] [%(request_id)s] [%(batch_id)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s"
         date_format = "%Y-%m-%d %H:%M:%S"
 
     # Console handler with colors
@@ -105,9 +110,9 @@ def setup_logging(
         console_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
         if HAS_COLORLOG and not json_format:
-            # Colored console formatter (includes request_id from context)
+            # Colored console formatter (includes request_id and batch_id from context)
             console_formatter = colorlog.ColoredFormatter(
-                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(request_id)s] [%(name)s:%(funcName)s:%(lineno)d]%(reset)s %(message)s",
+                fmt="%(log_color)s%(asctime)s [%(levelname)s] [%(request_id)s] [%(batch_id)s] [%(name)s:%(funcName)s:%(lineno)d]%(reset)s %(message)s",
                 datefmt=date_format,
                 log_colors={
                     "DEBUG": "cyan",
