@@ -186,7 +186,7 @@ async def startup_event():
     redis_dlq = await get_url_dlq()
 
     # Pass dependencies to controller
-    set_dependencies(url_repo, redis_queue)
+    set_dependencies(url_repo, redis_queue, redis_dlq)
 
     logger.info(f"Batch processor ready (batch_size={settings.batch_size})")
 

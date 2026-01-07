@@ -11,9 +11,10 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from shared.config.settings import get_settings
-from shared.config.dependencies import get_url_repository
+from shared.config.dependencies import get_url_repository, get_url_dlq
 from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
+from shared.utils.interfaces.queue import Queue
 
 # Import worker function from separate module
 from services.batch_processor.batch_worker import process_batch_from_queue
@@ -24,14 +25,16 @@ router = APIRouter()
 
 # Module-level instances (initialized by main.py startup event)
 url_repo: Optional[URLRepository] = None
-redis_queue = None
+redis_queue: Optional[Queue] = None
+redis_dlq: Optional[Queue] = None
 
 
-def set_dependencies(repo: URLRepository, queue):
-    """Set repository and queue instances (called from main.py startup)."""
-    global url_repo, redis_queue
+def set_dependencies(repo: URLRepository, queue: Queue, dlq: Queue) -> None:
+    """Set repository, queue, and DLQ instances (called from main.py startup)."""
+    global url_repo, redis_queue, redis_dlq
     url_repo = repo
     redis_queue = queue
+    redis_dlq = dlq
 
 
 async def ensure_queue_initialized():
@@ -58,6 +61,18 @@ async def ensure_repo_initialized():
         logger.info("URL repository initialized successfully")
 
     return url_repo
+
+
+async def ensure_dlq_initialized():
+    """Ensure DLQ is initialized (lazy initialization for serverless)."""
+    global redis_dlq
+
+    if redis_dlq is None:
+        logger.info("Lazy-initializing DLQ for serverless environment")
+        redis_dlq = await get_url_dlq()
+        logger.info("DLQ initialized successfully")
+
+    return redis_dlq
 
 
 @router.get("/status")
@@ -116,9 +131,10 @@ async def process_batch():
         JSON with processing statistics
     """
     try:
-        # Lazy-initialize queue and repo
+        # Lazy-initialize queue, repo, and DLQ
         queue = await ensure_queue_initialized()
         repo = await ensure_repo_initialized()
+        dlq = await ensure_dlq_initialized()
 
         if not queue:
             raise HTTPException(
@@ -127,7 +143,7 @@ async def process_batch():
             )
 
         # Process batch using worker function
-        result = await process_batch_from_queue(repo, queue)
+        result = await process_batch_from_queue(repo, queue, dlq)
 
         return JSONResponse(
             status_code=200,
