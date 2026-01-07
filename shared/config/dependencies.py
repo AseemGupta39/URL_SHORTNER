@@ -215,6 +215,82 @@ async def get_click_queue() -> Queue:
     return _click_queue_instance
 
 
+# Global URL Dead-Letter Queue instance (singleton)
+_url_dlq_instance: Queue | None = None
+_url_dlq_lock = asyncio.Lock()
+
+
+async def get_url_dlq() -> Queue:
+    """
+    Get the global URL Dead-Letter Queue instance (singleton).
+
+    Used for storing failed/unparseable URL messages for later inspection and debugging.
+
+    Returns:
+        RedisQueue for URL dead-letter messages (queue_name="url_batch_queue_dlq")
+    """
+    global _url_dlq_instance
+
+    if _url_dlq_instance is None:
+        async with _url_dlq_lock:
+            if _url_dlq_instance is None:
+                if not settings.redis_url:
+                    raise RuntimeError(
+                        "Redis queue is required for dead-letter queue. "
+                        "Please set REDIS_URL in your .env file."
+                    )
+
+                logger.info("Initializing URL Dead-Letter Queue (url_batch_queue_dlq)")
+                _url_dlq_instance = RedisQueue(
+                    redis_url=settings.redis_url,
+                    queue_name="url_batch_queue_dlq",
+                    max_connections=settings.redis_pool_max_connections,
+                    socket_timeout=settings.redis_queue_socket_timeout,
+                    socket_connect_timeout=settings.redis_queue_connect_timeout
+                )
+                await _url_dlq_instance.connect()
+
+    return _url_dlq_instance
+
+
+# Global Click Dead-Letter Queue instance (singleton)
+_click_dlq_instance: Queue | None = None
+_click_dlq_lock = asyncio.Lock()
+
+
+async def get_click_dlq() -> Queue:
+    """
+    Get the global Click Dead-Letter Queue instance (singleton).
+
+    Used for storing failed/unparseable click messages for later inspection and debugging.
+
+    Returns:
+        RedisQueue for click dead-letter messages (queue_name="click_batch_queue_dlq")
+    """
+    global _click_dlq_instance
+
+    if _click_dlq_instance is None:
+        async with _click_dlq_lock:
+            if _click_dlq_instance is None:
+                if not settings.redis_url:
+                    raise RuntimeError(
+                        "Redis queue is required for dead-letter queue. "
+                        "Please set REDIS_URL in your .env file."
+                    )
+
+                logger.info("Initializing Click Dead-Letter Queue (click_batch_queue_dlq)")
+                _click_dlq_instance = RedisQueue(
+                    redis_url=settings.redis_url,
+                    queue_name="click_batch_queue_dlq",
+                    max_connections=settings.redis_pool_max_connections,
+                    socket_timeout=settings.redis_queue_socket_timeout,
+                    socket_connect_timeout=settings.redis_queue_connect_timeout
+                )
+                await _click_dlq_instance.connect()
+
+    return _click_dlq_instance
+
+
 # Global URL repository instance (singleton)
 _url_repository_instance: URLRepository | None = None
 _url_repository_lock = asyncio.Lock()

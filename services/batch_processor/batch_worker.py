@@ -13,7 +13,7 @@ import logging
 from shared.config.settings import get_settings
 from shared.data.repositories import URLRepository
 from shared.core.schemas import URLData
-from shared.core.queue_messages import URLQueueMessage
+from shared.core.queue_messages import URLQueueMessage, DeadLetterQueueMessage
 from shared.utils import request_context
 from shared.utils.interfaces.queue import Queue
 from shared.middleware.metrics import (
@@ -31,6 +31,7 @@ settings = get_settings()
 async def process_batch_from_queue(
     url_repo: URLRepository,
     queue: Queue,
+    dlq: Queue,
     batch_size: int = None
 ) -> dict:
     """
@@ -39,6 +40,7 @@ async def process_batch_from_queue(
     Args:
         url_repo: URL repository for database operations
         queue: Queue instance (Redis or other implementation)
+        dlq: Dead-letter queue for failed/unparseable messages
         batch_size: Maximum number of URLs to process (defaults to settings)
 
     Returns:
@@ -110,6 +112,26 @@ async def process_batch_from_queue(
                     f"request_id={item.get('request_id', 'unknown')} | item={item}",
                     exc_info=True
                 )
+
+                # Move failed message to dead-letter queue for later inspection
+                try:
+                    dlq_msg = DeadLetterQueueMessage.from_failed_parse(
+                        original_message=item,
+                        exception=e,
+                        batch_id=batch_id
+                    )
+                    await dlq.enqueue(dlq_msg.to_dict())
+                    logger.info(
+                        f"Moved failed message to DLQ: request_id={dlq_msg.request_id} | "
+                        f"error_type={dlq_msg.error_type}"
+                    )
+                except Exception as dlq_error:
+                    logger.error(
+                        f"CRITICAL: Failed to enqueue to DLQ: error={dlq_error} | "
+                        f"original_message_lost={item}",
+                        exc_info=True
+                    )
+
                 continue
 
         if not url_data_list:
@@ -187,7 +209,7 @@ async def process_batch_from_queue(
         request_context.clear_batch_id()
 
 
-async def background_batch_processor(url_repo: URLRepository, queue: Queue):
+async def background_batch_processor(url_repo: URLRepository, queue: Queue, dlq: Queue):
     """
     Background task that processes batch queue periodically.
 
@@ -197,6 +219,7 @@ async def background_batch_processor(url_repo: URLRepository, queue: Queue):
     Args:
         url_repo: URL repository for database operations
         queue: Queue instance (Redis or other implementation)
+        dlq: Dead-letter queue for failed/unparseable messages
     """
     logger.info(f"Background scheduler started (interval={settings.batch_interval_seconds}s)")
 
@@ -204,11 +227,8 @@ async def background_batch_processor(url_repo: URLRepository, queue: Queue):
         try:
             await asyncio.sleep(settings.batch_interval_seconds)
 
-            if not queue:
-                continue
-
             # Process batch
-            await process_batch_from_queue(url_repo, queue)
+            await process_batch_from_queue(url_repo, queue, dlq)
 
         except asyncio.CancelledError:
             logger.info("Background scheduler cancelled gracefully")

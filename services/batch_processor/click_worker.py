@@ -15,7 +15,7 @@ import logging
 from shared.config.settings import get_settings
 from shared.data.interfaces.click_repository import ClickRepository
 from shared.core.schemas import ClickData
-from shared.core.queue_messages import ClickQueueMessage
+from shared.core.queue_messages import ClickQueueMessage, DeadLetterQueueMessage
 from shared.utils import request_context
 from shared.utils.interfaces.queue import Queue
 from shared.middleware.metrics import (
@@ -64,6 +64,7 @@ class ClickBatchResult:
 async def process_click_batch_from_queue(
     click_repo: ClickRepository,
     queue: Queue,
+    dlq: Queue,
     batch_size: int = None
 ) -> ClickBatchResult:
     """
@@ -72,6 +73,7 @@ async def process_click_batch_from_queue(
     Args:
         click_repo: Click repository for database operations
         queue: Queue instance (Redis or other implementation)
+        dlq: Dead-letter queue for failed/unparseable messages
         batch_size: Maximum number of clicks to process (defaults to settings)
 
     Returns:
@@ -149,6 +151,26 @@ async def process_click_batch_from_queue(
                     f"request_id={item.get('request_id', 'unknown')}",
                     exc_info=True
                 )
+
+                # Move failed message to dead-letter queue for later inspection
+                try:
+                    dlq_msg = DeadLetterQueueMessage.from_failed_parse(
+                        original_message=item,
+                        exception=e,
+                        batch_id=batch_id
+                    )
+                    await dlq.enqueue(dlq_msg.to_dict())
+                    logger.info(
+                        f"Moved failed message to DLQ: request_id={dlq_msg.request_id} | "
+                        f"error_type={dlq_msg.error_type}"
+                    )
+                except Exception as dlq_error:
+                    logger.error(
+                        f"CRITICAL: Failed to enqueue to DLQ: error={dlq_error} | "
+                        f"original_message_lost={item}",
+                        exc_info=True
+                    )
+
                 # Continue processing other items
 
         if not click_data_list:
@@ -235,6 +257,7 @@ async def process_click_batch_from_queue(
 async def background_click_batch_processor(
     click_repo: ClickRepository,
     queue: Queue,
+    dlq: Queue,
     interval_seconds: int = None
 ) -> None:
     """
@@ -248,6 +271,7 @@ async def background_click_batch_processor(
     Args:
         click_repo: Click repository for database operations
         queue: Queue instance (Redis or other implementation)
+        dlq: Dead-letter queue for failed/unparseable messages
         interval_seconds: Seconds to wait between batch processing (defaults to settings.click_batch_interval_seconds)
     """
     if interval_seconds is None:
@@ -261,7 +285,7 @@ async def background_click_batch_processor(
     while True:
         try:
             await asyncio.sleep(interval_seconds)
-            await process_click_batch_from_queue(click_repo, queue)
+            await process_click_batch_from_queue(click_repo, queue, dlq)
 
         except asyncio.CancelledError:
             logger.info("Click analytics background scheduler cancelled gracefully")

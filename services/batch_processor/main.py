@@ -22,7 +22,7 @@ from services.batch_processor.config import get_settings  # Service-specific set
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
-from shared.config.dependencies import get_url_repository, get_cache, get_url_queue, get_click_queue
+from shared.config.dependencies import get_url_repository, get_cache, get_url_queue, get_click_queue, get_url_dlq
 from shared.data.repositories import URLRepository
 from shared.utils.redis_queue import get_redis_queue
 from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
@@ -162,6 +162,7 @@ app.include_router(batch_router)
 # Global instances (initialized in startup event)
 url_repo: URLRepository = None
 redis_queue = None
+redis_dlq = None
 
 # Background task control
 background_task = None
@@ -170,7 +171,7 @@ background_task = None
 @app.on_event("startup")
 async def startup_event():
     """Initialize connections on startup."""
-    global background_task, url_repo, redis_queue
+    global background_task, url_repo, redis_queue, redis_dlq
 
     logger.info("Batch Processor Service starting up")
 
@@ -181,6 +182,9 @@ async def startup_event():
     redis_queue = get_redis_queue(settings.redis_url)
     await redis_queue.connect()
 
+    # Initialize dead-letter queue (always required for failed message handling)
+    redis_dlq = await get_url_dlq()
+
     # Pass dependencies to controller
     set_dependencies(url_repo, redis_queue)
 
@@ -188,7 +192,7 @@ async def startup_event():
 
     if settings.enable_background_scheduler:
         logger.info("Starting background scheduler (dev mode)")
-        background_task = asyncio.create_task(background_batch_processor())
+        background_task = asyncio.create_task(background_batch_processor(url_repo, redis_queue, redis_dlq))
     else:
         logger.info("Background scheduler disabled (production: use cron or scheduler)")
 
