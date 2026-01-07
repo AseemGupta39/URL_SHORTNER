@@ -159,7 +159,7 @@ def track_db_operation(
     ).observe(duration_seconds)
 
 
-def track_queue_operation(operation: QueueOperation, service: str):
+def track_queue_operation(operation: QueueOperation, service: str) -> None:
     """
     Track queue operation with type-safe enums.
 
@@ -170,22 +170,22 @@ def track_queue_operation(operation: QueueOperation, service: str):
     queue_operations_total.labels(operation=operation.value, service=service).inc()
 
 
-def update_queue_size(size: int, service: str):
+def update_queue_size(size: int, service: str) -> None:
     """Update current queue size gauge."""
     queue_size.labels(service=service).set(size)
 
 
-def track_url_shortened(service: str):
+def track_url_shortened(service: str) -> None:
     """Track URL shortening business event."""
     urls_shortened_total.labels(service=service).inc()
 
 
-def track_url_redirected(service: str):
+def track_url_redirected(service: str) -> None:
     """Track URL redirect business event."""
     urls_redirected_total.labels(service=service).inc()
 
 
-def track_batch_processed(urls_count: int, service: str):
+def track_batch_processed(urls_count: int, service: str) -> None:
     """Track batch processing business event."""
     batch_processed_total.labels(service=service).inc()
     batch_urls_inserted_total.labels(service=service).inc(urls_count)

@@ -3,8 +3,9 @@ Application settings configuration.
 """
 import os
 from pathlib import Path
+from typing import Any
 from pydantic_settings import BaseSettings
-from pydantic import field_validator, model_validator
+from pydantic import field_validator, model_validator, ValidationInfo
 
 
 class Settings(BaseSettings):
@@ -80,7 +81,7 @@ class Settings(BaseSettings):
     # Validators
     @field_validator('datacenter_id')
     @classmethod
-    def validate_datacenter_id(cls, v, info):
+    def validate_datacenter_id(cls, v: Any, info: ValidationInfo) -> int:
         """Validate datacenter_id is within valid range (0-15 for 4 bits)."""
         max_value = (1 << info.data.get('datacenter_bits', 4)) - 1
         if v < 0 or v > max_value:
@@ -89,7 +90,7 @@ class Settings(BaseSettings):
 
     @field_validator('worker_id')
     @classmethod
-    def validate_worker_id(cls, v, info):
+    def validate_worker_id(cls, v: Any, info: ValidationInfo) -> int:
         """Validate worker_id is within valid range (0-3 for 2 bits)."""
         max_value = (1 << info.data.get('worker_bits', 2)) - 1
         if v < 0 or v > max_value:
@@ -98,14 +99,14 @@ class Settings(BaseSettings):
 
     @field_validator('timestamp_bits', 'datacenter_bits', 'worker_bits', 'sequence_bits')
     @classmethod
-    def validate_bit_fields(cls, v, info):
+    def validate_bit_fields(cls, v: Any, info: ValidationInfo) -> int:
         """Validate bit field sizes are positive."""
         if v <= 0:
             raise ValueError(f"{info.field_name} must be positive")
         return v
 
     @model_validator(mode='after')
-    def validate_total_bits(self):
+    def validate_total_bits(self) -> "Settings":
         """Validate total bit allocation is exactly 47 for 8-character base62 codes."""
         total_bits = (
             self.timestamp_bits +
@@ -125,7 +126,7 @@ class Settings(BaseSettings):
 
     @field_validator('log_level')
     @classmethod
-    def validate_log_level(cls, v):
+    def validate_log_level(cls, v: Any) -> str:
         """Validate log level is a valid Python logging level."""
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         v_upper = v.upper()
@@ -135,7 +136,7 @@ class Settings(BaseSettings):
 
     @field_validator('base_url_scheme')
     @classmethod
-    def validate_url_scheme(cls, v):
+    def validate_url_scheme(cls, v: Any) -> str:
         """Validate URL scheme is http or https."""
         if v not in ['http', 'https']:
             raise ValueError("base_url_scheme must be 'http' or 'https'")
@@ -143,7 +144,7 @@ class Settings(BaseSettings):
 
     @field_validator('batch_size')
     @classmethod
-    def validate_batch_size(cls, v):
+    def validate_batch_size(cls, v: Any) -> int:
         """Validate batch size is reasonable."""
         if v <= 0:
             raise ValueError("batch_size must be positive")
@@ -153,7 +154,7 @@ class Settings(BaseSettings):
 
     @field_validator('batch_interval_seconds', 'click_batch_interval_seconds')
     @classmethod
-    def validate_interval_seconds(cls, v):
+    def validate_interval_seconds(cls, v: Any) -> int:
         """Validate interval is reasonable."""
         if v <= 0:
             raise ValueError(f"Interval must be positive")
@@ -163,7 +164,7 @@ class Settings(BaseSettings):
 
     @field_validator('cache_ttl_seconds')
     @classmethod
-    def validate_cache_ttl(cls, v):
+    def validate_cache_ttl(cls, v: Any) -> int:
         """Validate cache TTL is reasonable."""
         if v <= 0:
             raise ValueError("cache_ttl_seconds must be positive")
@@ -171,7 +172,7 @@ class Settings(BaseSettings):
 
     @field_validator('db_pool_size', 'db_pool_max_overflow')
     @classmethod
-    def validate_pool_sizes(cls, v):
+    def validate_pool_sizes(cls, v: Any) -> int:
         """Validate pool sizes are reasonable."""
         if v < 0:
             raise ValueError("Pool size must be non-negative")
@@ -181,7 +182,7 @@ class Settings(BaseSettings):
 
     @field_validator('redis_pool_max_connections')
     @classmethod
-    def validate_redis_pool(cls, v):
+    def validate_redis_pool(cls, v: Any) -> int:
         """Validate Redis pool size is reasonable."""
         if v <= 0:
             raise ValueError("redis_pool_max_connections must be positive")

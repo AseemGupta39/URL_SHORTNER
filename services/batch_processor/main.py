@@ -58,7 +58,7 @@ app.add_middleware(PrometheusMiddleware, service_name="batch_processor")
 # Health check endpoints (kept in main.py - see ARCHITECTURE.md for reasoning)
 # IMPORTANT: Must be defined BEFORE including batch_router to ensure proper route precedence
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict:
     """
     Basic health check for load balancer.
     Returns simple status without checking dependencies.
@@ -67,7 +67,7 @@ async def health_check():
 
 
 @app.get("/health/full")
-async def full_health_check():
+async def full_health_check() -> dict:
     """
     Comprehensive health check including all dependencies.
     Checks database, Redis cache, and queues connectivity.
@@ -101,7 +101,7 @@ async def full_health_check():
 
 
 @app.get("/health/db")
-async def database_health_check():
+async def database_health_check() -> dict:
     """Check database connectivity and performance."""
     try:
         repository = await get_url_repository()
@@ -118,7 +118,7 @@ async def database_health_check():
 
 
 @app.get("/health/redis")
-async def redis_health_check():
+async def redis_health_check() -> dict:
     """Check Redis connectivity and performance."""
     try:
         cache = await get_cache()
@@ -135,7 +135,7 @@ async def redis_health_check():
 
 
 @app.get("/health/queue")
-async def queue_health_check():
+async def queue_health_check() -> dict:
     """Check Redis queue connectivity and performance."""
     try:
         queue = await get_url_queue()
@@ -152,7 +152,7 @@ async def queue_health_check():
 
 
 @app.get("/metrics", tags=["Metrics"])
-async def metrics():
+async def metrics() -> str:
     """Expose Prometheus metrics."""
     return metrics_endpoint()
 
@@ -169,7 +169,7 @@ background_task = None
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Initialize connections on startup."""
     global background_task, url_repo, redis_queue, redis_dlq
 
@@ -198,7 +198,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+async def shutdown_event() -> None:
     """Close connections on shutdown."""
     global background_task
 

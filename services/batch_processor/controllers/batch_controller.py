@@ -37,7 +37,7 @@ def set_dependencies(repo: URLRepository, queue: Queue, dlq: Queue) -> None:
     redis_dlq = dlq
 
 
-async def ensure_queue_initialized():
+async def ensure_queue_initialized() -> Queue:
     """Ensure Redis queue is initialized (lazy initialization for serverless)."""
     global redis_queue
 
@@ -50,7 +50,7 @@ async def ensure_queue_initialized():
     return redis_queue
 
 
-async def ensure_repo_initialized():
+async def ensure_repo_initialized() -> URLRepository:
     """Ensure URL repository is initialized (lazy initialization for serverless)."""
     global url_repo
 
@@ -63,7 +63,7 @@ async def ensure_repo_initialized():
     return url_repo
 
 
-async def ensure_dlq_initialized():
+async def ensure_dlq_initialized() -> Queue:
     """Ensure DLQ is initialized (lazy initialization for serverless)."""
     global redis_dlq
 
@@ -76,7 +76,7 @@ async def ensure_dlq_initialized():
 
 
 @router.get("/status")
-async def get_status():
+async def get_status() -> dict:
     """
     Get batch processor status and queue information.
 
@@ -121,7 +121,7 @@ async def get_status():
 
 
 @router.post("/api/cron/process-batch")
-async def process_batch():
+async def process_batch() -> JSONResponse:
     """
     Process a batch of URLs from the queue and insert into database.
 

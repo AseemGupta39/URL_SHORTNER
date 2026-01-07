@@ -209,7 +209,7 @@ async def process_batch_from_queue(
         request_context.clear_batch_id()
 
 
-async def background_batch_processor(url_repo: URLRepository, queue: Queue, dlq: Queue):
+async def background_batch_processor(url_repo: URLRepository, queue: Queue, dlq: Queue) -> None:
     """
     Background task that processes batch queue periodically.
 
