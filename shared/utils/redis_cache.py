@@ -207,14 +207,3 @@ class RedisCache(Cache):
             "ttl_seconds": self.ttl_seconds,
             "key_prefix": self.key_prefix
         }
-
-
-_redis_cache: Optional[RedisCache] = None
-
-
-def get_redis_cache(redis_url: str, ttl_seconds: int = 3600) -> RedisCache:
-    """Get or create global Redis cache instance."""
-    global _redis_cache
-    if _redis_cache is None:
-        _redis_cache = RedisCache(redis_url, ttl_seconds)
-    return _redis_cache
