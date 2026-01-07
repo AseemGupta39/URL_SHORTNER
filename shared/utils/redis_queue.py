@@ -40,7 +40,7 @@ class RedisQueue(Queue):
             f"RedisQueue initialized (queue={queue_name}, pool_size={max_connections})"
         )
 
-    async def connect(self):
+    async def connect(self) -> None:
         """
         Establish Redis connection with connection pooling.
 
@@ -65,7 +65,7 @@ class RedisQueue(Queue):
                 logger.error(f"RedisQueue connection failed: {e}")
                 raise
 
-    async def close(self):
+    async def close(self) -> None:
         """Close Redis connection."""
         if self._client:
             await self._client.close()

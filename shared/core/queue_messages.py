@@ -14,7 +14,7 @@ class URLQueueMessage(BaseModel):
     request_id: str  # Required for end-to-end traceability (auto-captured from context)
 
     @classmethod
-    def from_url_data(cls, short_code: str, original_url: str, created_at: datetime):
+    def from_url_data(cls, short_code: str, original_url: str, created_at: datetime) -> "URLQueueMessage":
         """
         Create queue message from URL data.
 

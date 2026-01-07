@@ -11,12 +11,12 @@ class Queue(ABC):
     """Abstract base class for queue implementations."""
 
     @abstractmethod
-    async def connect(self):
+    async def connect(self) -> None:
         """Establish connection to queue backend."""
         pass
 
     @abstractmethod
-    async def close(self):
+    async def close(self) -> None:
         """Close connection to queue backend."""
         pass
 

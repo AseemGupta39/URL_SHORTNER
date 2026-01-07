@@ -3,7 +3,7 @@ Request ID middleware for FastAPI.
 
 Automatically generates and sets a unique request ID for every incoming HTTP request.
 """
-from fastapi import Request
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from shared.utils.request_context import generate_request_id, set_request_id, clear_request_id
@@ -27,7 +27,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         app.add_middleware(RequestIDMiddleware)
     """
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next) -> Response:
         """Process request and inject request ID."""
         # Generate and set request ID for this request
         request_id = generate_request_id()

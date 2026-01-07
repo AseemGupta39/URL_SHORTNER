@@ -22,7 +22,7 @@ except ImportError:
 _original_log_record_factory = logging.getLogRecordFactory()
 
 
-def _context_aware_log_record(*args, **kwargs):
+def _context_aware_log_record(*args, **kwargs) -> logging.LogRecord:
     """
     Custom LogRecord factory that automatically adds context variables to log records.
 
