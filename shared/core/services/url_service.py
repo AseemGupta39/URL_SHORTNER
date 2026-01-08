@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import HttpUrl
 import logging
 import asyncio
+import time
 
 from shared.core.schemas import URLData, ShortenResponse, RedirectResponse
 from shared.core.queue_messages import URLQueueMessage
@@ -14,6 +15,7 @@ from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.interfaces.cache import Cache
 from shared.utils.interfaces.queue import Queue
 from shared.core.exceptions import ShortCodeNotFoundException
+from shared.utils.timer import Timer
 from shared.middleware.metrics import (
     track_cache_operation,
     track_queue_operation,
@@ -83,12 +85,14 @@ class URLService:
         4. Queue for batch DB insert
         5. Return response instantly
         """
+        timer = Timer()
         logger.info(f"Shortening URL: {original_url}")
 
         try:
             # Generate short code
             short_code = await self.id_generator.generate_short_code()
-            logger.debug(f"Generated short_code={short_code} for url={original_url}")
+            timer.checkpoint('id_gen')
+            logger.debug(f"Generated short_code={short_code} for url={original_url} | id_gen_time={timer.checkpoints['id_gen']:.2f}ms")
 
             url_data = URLData(
                 short_code=short_code,
@@ -111,6 +115,7 @@ class URLService:
 
             # Execute both concurrently, handle exceptions gracefully
             results = await asyncio.gather(cache_task, queue_task, return_exceptions=True)
+            timer.checkpoint('cache_queue')
             cache_success, queue_success = results[0], results[1]
 
             # Handle cache result
@@ -136,7 +141,8 @@ class URLService:
                 )
                 queue_success = False
             elif queue_success:
-                logger.debug(f"Queue ENQUEUE successful: short_code={short_code}")
+                queue_size = await self.queue.size()
+                logger.debug(f"Queue ENQUEUE successful: short_code={short_code} | queue_depth={queue_size}")
                 track_queue_operation(QueueOperation.ENQUEUE, self.service_name)
             else:
                 logger.error(f"Queue ENQUEUE failed: short_code={short_code}", exc_info=True)
@@ -184,7 +190,9 @@ class URLService:
 
             logger.info(
                 f"URL shortened successfully: short_code={short_code} | "
-                f"short_url={short_url} | original_url={original_url}"
+                f"short_url={short_url} | original_url={original_url} | "
+                f"duration_ms={timer.total():.2f} | "
+                f"breakdown: id_gen={timer.checkpoints['id_gen']:.2f}ms, cache_queue={timer.checkpoints['cache_queue']:.2f}ms"
             )
 
             return ShortenResponse(
@@ -194,10 +202,20 @@ class URLService:
             )
 
         except Exception as e:
-            logger.error(
-                f"Failed to shorten URL: original_url={original_url} | error={str(e)}",
-                exc_info=True
-            )
+            try:
+                logger.error(
+                    f"Failed to shorten URL: short_code={short_code} | "
+                    f"original_url={original_url} | error={str(e)} | "
+                    f"duration_ms={timer.total():.2f}",
+                    exc_info=True
+                )
+            except NameError:
+                # short_code wasn't created yet (error during ID generation)
+                logger.error(
+                    f"Failed to shorten URL: original_url={original_url} | "
+                    f"error={str(e)} | duration_ms={timer.total():.2f}",
+                    exc_info=True
+                )
             raise
 
     async def resolve(self, short_code: str) -> RedirectResponse:
