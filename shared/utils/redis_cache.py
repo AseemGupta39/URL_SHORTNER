@@ -9,6 +9,7 @@ import logging
 
 from shared.utils.interfaces.cache import Cache
 from shared.core.schemas import URLData
+from shared.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +97,18 @@ class RedisCache(Cache):
             logger.warning("Redis not connected")
             return None
 
+        timer = Timer()
         try:
             full_key = self._make_key(key)
             value = await self._client.get(full_key)
 
             if value is None:
                 self._misses += 1
-                logger.debug(f"Cache miss: {key}")
+                logger.debug(f"Cache miss: {key} | redis_time={timer.total():.2f}ms")
                 return None
 
             self._hits += 1
-            logger.debug(f"Cache hit: {key}")
+            logger.debug(f"Cache hit: {key} | redis_time={timer.total():.2f}ms")
 
             data_dict = json.loads(value)
 
@@ -121,7 +123,7 @@ class RedisCache(Cache):
             return data_dict
 
         except Exception as e:
-            logger.error(f"Redis GET error [{key}]: {e}")
+            logger.error(f"Redis GET error [{key}]: {e} | redis_time={timer.total():.2f}ms")
             self._misses += 1
             return None
 
@@ -140,6 +142,7 @@ class RedisCache(Cache):
             logger.warning("Redis not connected")
             return False
 
+        timer = Timer()
         try:
             full_key = self._make_key(key)
 
@@ -154,11 +157,11 @@ class RedisCache(Cache):
             value_json = json.dumps(value_dict, default=str)
 
             await self._client.set(full_key, value_json, ex=self.ttl_seconds)
-            logger.debug(f"Cached: {key} (ttl={self.ttl_seconds}s)")
+            logger.debug(f"Cached: {key} (ttl={self.ttl_seconds}s) | redis_time={timer.total():.2f}ms")
             return True
 
         except Exception as e:
-            logger.error(f"Redis SET error [{key}]: {e}")
+            logger.error(f"Redis SET error [{key}]: {e} | redis_time={timer.total():.2f}ms")
             return False
 
     async def delete_async(self, key: str) -> bool:
