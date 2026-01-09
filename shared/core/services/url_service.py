@@ -160,9 +160,10 @@ class URLService:
                     )
                 except Exception as db_error:
                     # CRITICAL: Both queue AND DB failed - rollback cache to prevent orphaned entry
+                    pool_status = self.url_repo.get_pool_status()
                     logger.error(
                         f"CRITICAL: Queue and DB both failed, rolling back cache: "
-                        f"short_code={short_code} | error={db_error}",
+                        f"short_code={short_code} | pool_status={pool_status} | error={db_error}",
                         exc_info=True
                     )
 

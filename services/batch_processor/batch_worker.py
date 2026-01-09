@@ -198,9 +198,11 @@ async def process_batch_from_queue(
 
         except Exception as e:
             db_duration_ms = (time.time() - db_start) * 1000
+            pool_status = url_repo.get_pool_status()
             logger.error(
                 f"Batch INSERT failed: batch_id={batch_id} | "
-                f"count={len(url_data_list)} | db_time={db_duration_ms:.2f}ms | error={str(e)}",
+                f"count={len(url_data_list)} | db_time={db_duration_ms:.2f}ms | "
+                f"pool_status={pool_status} | error={str(e)}",
                 exc_info=True
             )
             raise

@@ -240,3 +240,37 @@ class SQLiteURLRepository(URLRepository):
             stmt = select(URLModel.short_code).where(URLModel.short_code == short_code)
             result = await session.execute(stmt)
             return result.scalar_one_or_none() is not None
+
+    def get_pool_status(self) -> dict:
+        """
+        Get current connection pool status for debugging.
+
+        Returns:
+            dict with pool statistics (or status message if pooling not supported)
+        """
+        if self.engine is None:
+            return {"status": "not_initialized"}
+
+        pool = self.engine.pool
+        if pool is None:
+            return {"status": "no_pool"}
+
+        # Databases WITH connection pooling support (whitelist)
+        POOLING_DATABASES = ["postgresql", "asyncpg", "mysql", "pymysql", "mariadb"]
+
+        has_pooling = any(db_name in self.db_url for db_name in POOLING_DATABASES)
+
+        if not has_pooling:
+            # Unknown or no-pooling database (SQLite, etc.)
+            return {"status": "no_pooling_support"}
+
+        # Return pool statistics for supported databases
+        return {
+            "size": pool.size(),  # Current pool size
+            "checked_in": pool.checkedin(),  # Available connections
+            "checked_out": pool.checkedout(),  # In-use connections
+            "overflow": pool.overflow(),  # Overflow connections created
+            "max_overflow": self.max_overflow,
+            "pool_size": self.pool_size,
+            "status": "active"
+        }
