@@ -74,7 +74,9 @@ class RedisQueue(Queue):
 
     async def enqueue(self, data: Dict[str, Any]) -> bool:
         """
-        Add item to queue.
+        Add item to queue (FIFO order).
+
+        Uses RPUSH to add to right side, maintaining FIFO order with LRANGE from left.
 
         Args:
             data: Dictionary to enqueue
@@ -88,7 +90,7 @@ class RedisQueue(Queue):
 
         try:
             data_json = json.dumps(data)
-            await self._client.lpush(self.queue_name, data_json)
+            await self._client.rpush(self.queue_name, data_json)  # Push to RIGHT for FIFO
             logger.debug(f"Enqueued to {self.queue_name}")
             return True
 
@@ -156,15 +158,16 @@ class RedisQueue(Queue):
 
     async def peek(self, count: int = 1) -> List[Dict[str, Any]]:
         """
-        Peek at items without removing them from queue.
+        Peek at items without removing them from queue (FIFO order).
 
-        Uses LRANGE to read items without removing (safe for data loss prevention).
+        Uses LRANGE to read from left side, maintaining FIFO order with RPUSH to right.
+        Safe for data loss prevention - items remain in queue.
 
         Args:
             count: Number of items to peek at
 
         Returns:
-            List of dictionaries (items remain in queue)
+            List of dictionaries in FIFO order (oldest first)
         """
         if not self._client:
             logger.warning("RedisQueue not connected")
@@ -183,12 +186,13 @@ class RedisQueue(Queue):
 
     async def remove_first(self, count: int) -> bool:
         """
-        Remove first N items from queue.
+        Remove first N items from queue (FIFO order).
 
-        Uses LTRIM to remove items AFTER successful processing.
+        Uses LTRIM to remove items from left side AFTER successful processing.
+        Works with RPUSH enqueue and LRANGE peek to maintain FIFO order.
 
         Args:
-            count: Number of items to remove from front
+            count: Number of items to remove from front (oldest items)
 
         Returns:
             True if successful, False otherwise
