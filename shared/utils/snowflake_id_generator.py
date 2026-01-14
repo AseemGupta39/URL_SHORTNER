@@ -102,7 +102,7 @@ class SnowflakeIDGenerator(IDGenerator):
         """
         timestamp = self._current_timestamp_sec()
         while timestamp <= last_timestamp:
-            await asyncio.sleep(0.001)  # Sleep 1ms to avoid busy-wait blocking
+            await asyncio.sleep(0.010)  # Sleep 10ms - sweet spot for CPU efficiency while avoiding busy-wait
             timestamp = self._current_timestamp_sec()
         return timestamp
 
