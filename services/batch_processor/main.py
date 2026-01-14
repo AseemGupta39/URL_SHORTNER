@@ -199,7 +199,7 @@ async def startup_event() -> None:
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
-    """Close connections on shutdown."""
+    """Close connections on shutdown to prevent resource leaks."""
     global background_task
 
     logger.info("Batch Processor Service shutting down")
@@ -212,9 +212,17 @@ async def shutdown_event() -> None:
             pass
 
     await url_repo.close()
+    logger.debug("URL repository closed")
 
     if redis_queue:
         await redis_queue.close()
+        logger.debug("Redis queue closed")
+
+    if redis_dlq:
+        await redis_dlq.close()
+        logger.debug("Redis DLQ closed")
+
+    logger.info("Batch Processor Service shutdown complete")
 
 
 if __name__ == "__main__":

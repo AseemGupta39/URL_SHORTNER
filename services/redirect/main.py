@@ -168,6 +168,34 @@ async def metrics() -> str:
 # Include API routers (AFTER defining /metrics to prevent /{short_code} from catching it)
 app.include_router(redirect_router)
 
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """Close singleton resources on shutdown to prevent leaks."""
+    logger.info("Redirect Service shutting down - closing connections")
+
+    # Close singletons via dependency injection getters
+    from shared.config.dependencies import (
+        _url_repo_instance,
+        _cache_instance,
+        _click_queue_instance
+    )
+
+    if _url_repo_instance:
+        await _url_repo_instance.close()
+        logger.debug("URL repository closed")
+
+    if _cache_instance:
+        await _cache_instance.close()
+        logger.debug("Cache connection closed")
+
+    if _click_queue_instance:
+        await _click_queue_instance.close()
+        logger.debug("Click queue connection closed")
+
+    logger.info("Redirect Service shutdown complete")
+
+
 logger.info("Redirect Service started")
 
 # For local debugging in VSCode (press F5)

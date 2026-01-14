@@ -169,6 +169,32 @@ async def metrics() -> str:
     """Expose Prometheus metrics."""
     return metrics_endpoint()
 
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """Close singleton resources on shutdown to prevent leaks."""
+    logger.info("Shorten Service shutting down - closing connections")
+
+    # Close singletons via dependency injection getters
+    from shared.config.dependencies import (
+        _url_repo_instance,
+        _cache_instance,
+        _url_queue_instance
+    )
+
+    if _url_repo_instance:
+        await _url_repo_instance.close()
+        logger.debug("URL repository closed")
+
+    if _cache_instance:
+        await _cache_instance.close()
+        logger.debug("Cache connection closed")
+
+    if _url_queue_instance:
+        await _url_queue_instance.close()
+        logger.debug("Queue connection closed")
+
+    logger.info("Shorten Service shutdown complete")
+
 # Include API routers (AFTER defining /metrics to prevent route conflicts)
 app.include_router(url_router)
 
