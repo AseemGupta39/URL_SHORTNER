@@ -14,7 +14,6 @@ from shared.data.repositories.click_repository import SQLiteClickRepository
 from shared.core.services import URLService
 from shared.core.services.click_analytics_service import ClickAnalyticsService
 from shared.utils.interfaces.cache import Cache
-from shared.utils.lru_cache import LRUCache
 from shared.utils.redis_cache import RedisCache
 from shared.utils.interfaces.queue import Queue
 from shared.utils.redis_queue import RedisQueue
@@ -93,22 +92,19 @@ async def get_cache() -> Cache:
         async with _cache_lock:
             # Double-check: another coroutine may have initialized while we waited
             if _cache_instance is None:
-                if settings.redis_enabled and settings.redis_url:
-                    logger.info("Initializing RedisCache with connection pooling")
-                    _cache_instance = RedisCache(
-                        redis_url=settings.redis_url,
-                        ttl_seconds=settings.cache_ttl_seconds,
-                        max_connections=settings.redis_pool_max_connections,
-                        socket_timeout=settings.redis_cache_socket_timeout,
-                        socket_connect_timeout=settings.redis_cache_connect_timeout
-                    )
-                    await _cache_instance.connect()
-                else:
-                    logger.info("Initializing LRUCache")
-                    _cache_instance = LRUCache(
-                        max_size=settings.cache_max_size,
-                        ttl_seconds=settings.cache_ttl_seconds
-                    )
+                # Redis is required - fail fast if not configured
+                if not settings.redis_url:
+                    raise ValueError("REDIS_URL is required. Redis is fundamental to the architecture.")
+
+                logger.info("Initializing RedisCache with connection pooling")
+                _cache_instance = RedisCache(
+                    redis_url=settings.redis_url,
+                    ttl_seconds=settings.cache_ttl_seconds,
+                    max_connections=settings.redis_pool_max_connections,
+                    socket_timeout=settings.redis_cache_socket_timeout,
+                    socket_connect_timeout=settings.redis_cache_connect_timeout
+                )
+                await _cache_instance.connect()
 
     return _cache_instance
 
