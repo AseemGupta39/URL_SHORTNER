@@ -11,9 +11,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from shared.config.settings import get_settings
-from shared.config.dependencies import get_url_repository, get_url_dlq
+from shared.config.dependencies import get_url_repository, get_url_queue, get_url_dlq
 from shared.data.repositories import URLRepository
-from shared.utils.redis_queue import get_redis_queue
 from shared.utils.interfaces.queue import Queue
 
 # Import worker function from separate module
@@ -25,29 +24,28 @@ router = APIRouter()
 
 # Module-level instances (initialized by main.py startup event)
 url_repo: Optional[URLRepository] = None
-redis_queue: Optional[Queue] = None
-redis_dlq: Optional[Queue] = None
+url_queue: Optional[Queue] = None
+url_dlq: Optional[Queue] = None
 
 
 def set_dependencies(repo: URLRepository, queue: Queue, dlq: Queue) -> None:
     """Set repository, queue, and DLQ instances (called from main.py startup)."""
-    global url_repo, redis_queue, redis_dlq
+    global url_repo, url_queue, url_dlq
     url_repo = repo
-    redis_queue = queue
-    redis_dlq = dlq
+    url_queue = queue
+    url_dlq = dlq
 
 
 async def ensure_queue_initialized() -> Queue:
-    """Ensure Redis queue is initialized (lazy initialization for serverless)."""
-    global redis_queue
+    """Ensure URL queue is initialized (lazy initialization for serverless)."""
+    global url_queue
 
-    if redis_queue is None:
-        logger.info("Lazy-initializing Redis queue for serverless environment")
-        redis_queue = get_redis_queue(settings.redis_url)
-        await redis_queue.connect()
-        logger.info("Redis queue initialized successfully")
+    if url_queue is None:
+        logger.info("Lazy-initializing URL queue for serverless environment")
+        url_queue = await get_url_queue()
+        logger.info("URL queue initialized successfully")
 
-    return redis_queue
+    return url_queue
 
 
 async def ensure_repo_initialized() -> URLRepository:
@@ -65,14 +63,14 @@ async def ensure_repo_initialized() -> URLRepository:
 
 async def ensure_dlq_initialized() -> Queue:
     """Ensure DLQ is initialized (lazy initialization for serverless)."""
-    global redis_dlq
+    global url_dlq
 
-    if redis_dlq is None:
+    if url_dlq is None:
         logger.info("Lazy-initializing DLQ for serverless environment")
-        redis_dlq = await get_url_dlq()
+        url_dlq = await get_url_dlq()
         logger.info("DLQ initialized successfully")
 
-    return redis_dlq
+    return url_dlq
 
 
 @router.get("/status")
