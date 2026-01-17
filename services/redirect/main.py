@@ -176,13 +176,13 @@ async def shutdown_event() -> None:
 
     # Close singletons via dependency injection getters
     from shared.config.dependencies import (
-        _url_repo_instance,
+        _url_repository_instance,
         _cache_instance,
         _click_queue_instance
     )
 
-    if _url_repo_instance:
-        await _url_repo_instance.close()
+    if _url_repository_instance:
+        await _url_repository_instance.close()
         logger.debug("URL repository closed")
 
     if _cache_instance:
