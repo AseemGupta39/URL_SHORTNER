@@ -58,7 +58,7 @@ def setup_logging(
     log_level: str = "INFO",
     base_log_dir: str = "logs",
     log_filename: Optional[str] = None,
-    max_bytes: int = 10_000_000,  # 10MB
+    max_bytes: int = 5_000_000,  # 5MB
     backup_count: int = 5,
     json_format: bool = False,
     enable_console: bool = True,
@@ -201,3 +201,6 @@ def _configure_third_party_loggers() -> None:
 
     # Reduce httpx verbosity (used by httpx, FastAPI TestClient)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # Reduce aiosqlite verbosity (async SQLite driver)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
