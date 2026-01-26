@@ -3,6 +3,7 @@ import asyncio
 import logging
 
 from shared.utils.interfaces.id_generator import IDGenerator
+from shared.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,11 @@ class SnowflakeIDGenerator(IDGenerator):
         Raises:
             RuntimeError: If clock moves backwards or timestamp exceeds max
         """
+        timer = Timer()
+
         async with self._lock:
+            timer.checkpoint('lock_acquired')
+
             timestamp = self._current_timestamp_sec()
 
             # Clock moved backwards
@@ -175,13 +180,29 @@ class SnowflakeIDGenerator(IDGenerator):
                 self.sequence
             )
 
-            # Log every ID generation in DEBUG mode (comprehensive logging as requested)
+            timer.checkpoint('work_done')
+
+        # Timing logged outside lock
+        timer.checkpoint('lock_released')
+
+        wait_time = timer.elapsed(end='lock_acquired')
+        work_time = timer.elapsed(end='work_done', start='lock_acquired')
+        release_time = timer.elapsed(end='lock_released', start='work_done')
+
+        # Log timing for slow requests (>50ms wait = likely contention)
+        if wait_time > 50:
+            logger.warning(
+                f"ID Gen SLOW: wait={wait_time:.2f}ms, work={work_time:.2f}ms, "
+                f"release={release_time:.2f}ms, seq={self.sequence}"
+            )
+        else:
             logger.debug(
                 f"Generated ID: {id_value} [ts={relative_timestamp}, dc={self.datacenter_id}, "
-                f"w={self.worker_id}, seq={self.sequence}]"
+                f"w={self.worker_id}, seq={self.sequence}] | "
+                f"wait={wait_time:.2f}ms, work={work_time:.2f}ms"
             )
 
-            return id_value
+        return id_value
 
     def encode_base62(self, num: int) -> str:
         """

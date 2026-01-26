@@ -92,7 +92,7 @@ class URLService:
             # Generate short code
             short_code = await self.id_generator.generate_short_code()
             timer.checkpoint('id_gen')
-            logger.debug(f"Generated short_code={short_code} for url={original_url} | id_gen_time={timer.checkpoints['id_gen']:.2f}ms")
+            logger.debug(f"Generated short_code={short_code} for url={original_url} | id_gen_time={timer.elapsed(end='id_gen'):.2f}ms")
 
             url_data = URLData(
                 short_code=short_code,
@@ -193,7 +193,7 @@ class URLService:
                 f"URL shortened successfully: short_code={short_code} | "
                 f"short_url={short_url} | original_url={original_url} | "
                 f"duration_ms={timer.total():.2f} | "
-                f"breakdown: id_gen={timer.checkpoints['id_gen']:.2f}ms, cache_queue={timer.checkpoints['cache_queue']:.2f}ms"
+                f"breakdown: id_gen={timer.elapsed(end='id_gen'):.2f}ms, cache_queue={timer.elapsed(end='cache_queue', start='id_gen'):.2f}ms"
             )
 
             return ShortenResponse(
