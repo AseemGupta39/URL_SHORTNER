@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 import logging
 
 from shared.utils.interfaces.queue import Queue
+from shared.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 
@@ -88,14 +89,15 @@ class RedisQueue(Queue):
             logger.warning("RedisQueue not connected")
             return False
 
+        timer = Timer()
         try:
             data_json = json.dumps(data)
             await self._client.rpush(self.queue_name, data_json)  # Push to RIGHT for FIFO
-            logger.debug(f"Enqueued to {self.queue_name}")
+            logger.debug(f"Enqueued to {self.queue_name} | redis_time={timer.total():.2f}ms")
             return True
 
         except Exception as e:
-            logger.error(f"RedisQueue enqueue error: {e}")
+            logger.error(f"RedisQueue enqueue error: {e} | redis_time={timer.total():.2f}ms")
             return False
 
     async def dequeue(self, count: int = 1) -> List[Dict[str, Any]]:
@@ -112,20 +114,23 @@ class RedisQueue(Queue):
             logger.warning("RedisQueue not connected")
             return []
 
+        timer = Timer()
         try:
             if count == 1:
                 result = await self._client.rpop(self.queue_name)
                 if result:
+                    logger.debug(f"Dequeued 1 item from {self.queue_name} | redis_time={timer.total():.2f}ms")
                     return [json.loads(result)]
                 return []
             else:
                 results = await self._client.rpop(self.queue_name, count)
                 if results:
+                    logger.debug(f"Dequeued {len(results)} items from {self.queue_name} | redis_time={timer.total():.2f}ms")
                     return [json.loads(item) for item in results]
                 return []
 
         except Exception as e:
-            logger.error(f"RedisQueue dequeue error: {e}")
+            logger.error(f"RedisQueue dequeue error: {e} | redis_time={timer.total():.2f}ms")
             return []
 
     async def size(self) -> int:
@@ -173,15 +178,17 @@ class RedisQueue(Queue):
             logger.warning("RedisQueue not connected")
             return []
 
+        timer = Timer()
         try:
             # LRANGE 0 (count-1) gets first 'count' items without removing
             results = await self._client.lrange(self.queue_name, 0, count - 1)
             if results:
+                logger.debug(f"Peeked {len(results)} items from {self.queue_name} | redis_time={timer.total():.2f}ms")
                 return [json.loads(item) for item in results]
             return []
 
         except Exception as e:
-            logger.error(f"RedisQueue peek error: {e}")
+            logger.error(f"RedisQueue peek error: {e} | redis_time={timer.total():.2f}ms")
             return []
 
     async def remove_first(self, count: int) -> bool:
@@ -201,12 +208,13 @@ class RedisQueue(Queue):
             logger.warning("RedisQueue not connected")
             return False
 
+        timer = Timer()
         try:
             # LTRIM count -1 removes first 'count' items (keeps from index 'count' onwards)
             await self._client.ltrim(self.queue_name, count, -1)
-            logger.debug(f"Removed first {count} items from {self.queue_name}")
+            logger.debug(f"Removed first {count} items from {self.queue_name} | redis_time={timer.total():.2f}ms")
             return True
 
         except Exception as e:
-            logger.error(f"RedisQueue remove_first error: {e}")
+            logger.error(f"RedisQueue remove_first error: {e} | redis_time={timer.total():.2f}ms")
             return False

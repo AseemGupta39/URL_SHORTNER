@@ -6,7 +6,6 @@ from typing import Optional
 from pydantic import HttpUrl
 import logging
 import asyncio
-import time
 
 from shared.core.schemas import URLData, ShortenResponse, RedirectResponse
 from shared.core.queue_messages import URLQueueMessage
@@ -192,7 +191,7 @@ class URLService:
             logger.info(
                 f"URL shortened successfully: short_code={short_code} | "
                 f"short_url={short_url} | original_url={original_url} | "
-                f"duration_ms={timer.total():.2f} | "
+                f"duration={timer.total():.2f}ms | "
                 f"breakdown: id_gen={timer.elapsed(end='id_gen'):.2f}ms, cache_queue={timer.elapsed(end='cache_queue', start='id_gen'):.2f}ms"
             )
 
@@ -207,14 +206,14 @@ class URLService:
                 logger.error(
                     f"Failed to shorten URL: short_code={short_code} | "
                     f"original_url={original_url} | error={str(e)} | "
-                    f"duration_ms={timer.total():.2f}",
+                    f"duration={timer.total():.2f}ms",
                     exc_info=True
                 )
             except NameError:
                 # short_code wasn't created yet (error during ID generation)
                 logger.error(
                     f"Failed to shorten URL: original_url={original_url} | "
-                    f"error={str(e)} | duration_ms={timer.total():.2f}",
+                    f"error={str(e)} | duration={timer.total():.2f}ms",
                     exc_info=True
                 )
             raise
@@ -253,24 +252,23 @@ class URLService:
 
             # Query repository on cache miss
             logger.debug(f"Querying DB for short_code={short_code}")
-            import time
-            db_start = time.time()
+            db_timer = Timer()
 
             url_data = await self.url_repo.get_by_short_code(short_code)
 
-            db_duration_ms = (time.time() - db_start) * 1000
+            db_duration = db_timer.total()
 
             if url_data is None:
                 logger.warning(
                     f"Short code NOT FOUND: short_code={short_code} | "
-                    f"db_query_time={db_duration_ms:.2f}ms"
+                    f"db_query_time={db_duration:.2f}ms"
                 )
                 raise ShortCodeNotFoundException(short_code)
 
             logger.info(
                 f"DB lookup successful: short_code={short_code} | "
                 f"original_url={url_data.original_url} | "
-                f"db_query_time={db_duration_ms:.2f}ms"
+                f"db_query_time={db_duration:.2f}ms"
             )
 
             # Warm cache for future requests

@@ -4,9 +4,10 @@ Prometheus Metrics Middleware
 Tracks HTTP requests, response times, and exposes /metrics endpoint.
 Provides helper functions for service-layer metrics (cache, DB, queue, business events).
 """
-import time
 import logging
 from typing import Callable
+
+from shared.utils.timer import Timer
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -65,11 +66,12 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
         endpoint = request.url.path
         method = request.method
-        start_time = time.time()
+        timer = Timer()
 
         try:
             response = await call_next(request)
-            duration = time.time() - start_time
+            duration = timer.total()  # milliseconds
+            duration_seconds = duration / 1000  # Prometheus expects seconds
 
             # Record success metrics
             http_requests_total.labels(
@@ -83,17 +85,17 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
                 method=method,
                 endpoint=endpoint,
                 service=self.service_name
-            ).observe(duration)
+            ).observe(duration_seconds)
 
             logger.debug(
                 f"HTTP metric: method={method} | endpoint={endpoint} | "
-                f"status={response.status_code} | duration={duration*1000:.2f}ms"
+                f"status={response.status_code} | duration={duration:.2f}ms"
             )
 
             return response
 
         except Exception as e:
-            duration = time.time() - start_time
+            duration = timer.total()  # milliseconds
 
             # Record error metrics
             http_requests_total.labels(
@@ -105,7 +107,7 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
             logger.error(
                 f"HTTP error: method={method} | endpoint={endpoint} | "
-                f"duration={duration*1000:.2f}ms | error={str(e)}",
+                f"duration={duration:.2f}ms | error={str(e)}",
                 exc_info=True
             )
             raise

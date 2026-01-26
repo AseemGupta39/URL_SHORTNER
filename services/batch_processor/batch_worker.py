@@ -6,9 +6,10 @@ Runs as a background task or scheduled cron job.
 """
 import asyncio
 import uuid
-import time
 from datetime import datetime
 import logging
+
+from shared.utils.timer import Timer
 
 from shared.config.settings import get_settings
 from shared.data.repositories import URLRepository
@@ -70,7 +71,7 @@ async def process_batch_from_queue(
 
         logger.info(f"Starting batch processing: batch_id={batch_id} | queue_size={queue_size}")
 
-        start_time = time.time()
+        timer = Timer()
 
         # Peek at items WITHOUT removing (prevents data loss on DB failure)
         items = await queue.peek(count=batch_size)
@@ -149,12 +150,12 @@ async def process_batch_from_queue(
             }
 
         # Insert to database
-        db_start = time.time()
+        db_timer = Timer()
 
         try:
             inserted_count = await url_repo.batch_create(url_data_list)
-            db_duration_ms = (time.time() - db_start) * 1000
-            db_duration_seconds = db_duration_ms / 1000
+            db_duration = db_timer.total()
+            db_duration_seconds = db_duration / 1000
 
             # Track DB operation with timing
             track_db_operation(DBOperation.BATCH_WRITE, db_duration_seconds, "batch_processor")
@@ -175,15 +176,15 @@ async def process_batch_from_queue(
             remaining_size = await queue.size()
             update_queue_size(remaining_size, "batch_processor")
 
-            total_duration_ms = (time.time() - start_time) * 1000
+            total_duration = timer.total()
 
             # Track business event
             track_batch_processed(inserted_count, "batch_processor")
 
             logger.info(
                 f"Batch INSERT successful: batch_id={batch_id} | "
-                f"inserted={inserted_count} | db_time={db_duration_ms:.2f}ms | "
-                f"total_time={total_duration_ms:.0f}ms | remaining_queue={remaining_size} | "
+                f"inserted={inserted_count} | db_time={db_duration:.2f}ms | "
+                f"total_time={total_duration:.0f}ms | remaining_queue={remaining_size} | "
                 f"failed_parse={failed_parse_count}"
             )
 
@@ -192,16 +193,16 @@ async def process_batch_from_queue(
                 "processed": inserted_count,
                 "queue_size_before": queue_size,
                 "queue_size_after": remaining_size,
-                "duration_ms": int(total_duration_ms),
+                "duration_ms": int(total_duration),
                 "failed_parse": failed_parse_count
             }
 
         except Exception as e:
-            db_duration_ms = (time.time() - db_start) * 1000
+            db_duration = db_timer.total()
             pool_status = url_repo.get_pool_status()
             logger.error(
                 f"Batch INSERT failed: batch_id={batch_id} | "
-                f"count={len(url_data_list)} | db_time={db_duration_ms:.2f}ms | "
+                f"count={len(url_data_list)} | db_time={db_duration:.2f}ms | "
                 f"pool_status={pool_status} | error={str(e)}",
                 exc_info=True
             )

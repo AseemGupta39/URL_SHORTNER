@@ -8,9 +8,10 @@ In production (Docker/AWS), use scheduled cron job instead.
 """
 import asyncio
 import uuid
-import time
 from datetime import datetime
 import logging
+
+from shared.utils.timer import Timer
 
 from shared.config.settings import get_settings
 from shared.data.interfaces.click_repository import ClickRepository
@@ -103,7 +104,7 @@ async def process_click_batch_from_queue(
 
         logger.info(f"Starting click batch processing: batch_id={batch_id} | queue_size={queue_size}")
 
-        start_time = time.time()
+        timer = Timer()
 
         # Peek at items WITHOUT removing (prevents data loss on DB failure)
         items = await queue.peek(count=batch_size)
@@ -184,17 +185,17 @@ async def process_click_batch_from_queue(
                 processed=0,
                 queue_size_before=queue_size,
                 queue_size_after=remaining_size,
-                duration_ms=(time.time() - start_time) * 1000,
+                duration_ms=timer.total(),
                 failed_parse=failed_parse_count
             )
 
         # Insert to database
-        db_start = time.time()
+        db_timer = Timer()
 
         try:
             inserted_count = await click_repo.batch_create(click_data_list)
-            db_duration_ms = (time.time() - db_start) * 1000
-            db_duration_seconds = db_duration_ms / 1000
+            db_duration = db_timer.total()
+            db_duration_seconds = db_duration / 1000
 
             # Track DB operation with timing
             track_db_operation(DBOperation.BATCH_WRITE, db_duration_seconds, "click_analytics")
@@ -215,15 +216,15 @@ async def process_click_batch_from_queue(
             remaining_size = await queue.size()
             update_queue_size(remaining_size, "click_analytics")
 
-            total_duration_ms = (time.time() - start_time) * 1000
+            total_duration = timer.total()
 
             # Track business event
             track_batch_processed(inserted_count, "click_analytics")
 
             logger.info(
                 f"Click batch INSERT successful: batch_id={batch_id} | "
-                f"inserted={inserted_count} | db_time={db_duration_ms:.2f}ms | "
-                f"total_time={total_duration_ms:.0f}ms | remaining_queue={remaining_size} | "
+                f"inserted={inserted_count} | db_time={db_duration:.2f}ms | "
+                f"total_time={total_duration:.0f}ms | remaining_queue={remaining_size} | "
                 f"failed_parse={failed_parse_count}"
             )
 
@@ -232,7 +233,7 @@ async def process_click_batch_from_queue(
                 processed=inserted_count,
                 queue_size_before=queue_size,
                 queue_size_after=remaining_size,
-                duration_ms=total_duration_ms,
+                duration_ms=total_duration,
                 failed_parse=failed_parse_count
             )
 

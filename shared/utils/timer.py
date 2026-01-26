@@ -34,7 +34,7 @@ class Timer:
             timer.checkpoint('step_2')
 
             logger.info(
-                f"duration_ms={timer.total():.2f} | "
+                f"duration={timer.total():.2f}ms | "
                 f"breakdown: step_1={timer.elapsed(end='step_1'):.2f}ms, "
                 f"step_2={timer.elapsed(end='step_2', start='step_1'):.2f}ms"
             )
