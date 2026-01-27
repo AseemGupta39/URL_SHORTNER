@@ -58,7 +58,7 @@ def setup_logging(
     log_level: str = "INFO",
     base_log_dir: str = "logs",
     log_filename: Optional[str] = None,
-    max_bytes: int = 5_000_000,  # 5MB
+    max_bytes: int = 2_000_000,  # 2MB
     backup_count: int = 5,
     json_format: bool = False,
     enable_console: bool = True,
@@ -72,7 +72,7 @@ def setup_logging(
         log_level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         base_log_dir: Base directory for logs (default: 'logs')
         log_filename: Custom log filename (default: {service_name}.log)
-        max_bytes: Maximum size per log file before rotation (default: 10MB)
+        max_bytes: Maximum size per log file before rotation (default: 2MB)
         backup_count: Number of backup files to keep (default: 5)
         json_format: If True, use JSON format instead of colored text (default: False)
         enable_console: Enable console logging (default: True)

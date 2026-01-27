@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from shared.data.interfaces.url_repository import URLRepository
 from shared.data.models import URLModel, Base
 from shared.core.schemas import URLData
+from shared.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class SQLiteURLRepository(URLRepository):
         if self.engine is not None:
             return  # Already initialized
 
+        timer = Timer()
         logger.debug("Initializing database connection")
 
         # Check if we're using SQLite or PostgreSQL
@@ -120,7 +122,7 @@ class SQLiteURLRepository(URLRepository):
             expire_on_commit=False
         )
 
-        logger.info("Database initialized successfully")
+        logger.info(f"Database initialized successfully | connect_time={timer.total():.2f}ms")
 
     async def close(self) -> None:
         """Close database connection."""

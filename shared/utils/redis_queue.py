@@ -48,6 +48,7 @@ class RedisQueue(Queue):
         Creates a connection pool that reuses connections (like PgBouncer).
         """
         if self._client is None:
+            timer = Timer()
             try:
                 self._client = await aioredis.from_url(
                     self.redis_url,
@@ -59,11 +60,11 @@ class RedisQueue(Queue):
                 )
                 await self._client.ping()
                 logger.info(
-                    f"RedisQueue connected (pool_size={self.max_connections}, "
-                    f"timeout={self.socket_timeout}s)"
+                    f"RedisQueue connected | queue={self.queue_name} | pool_size={self.max_connections} | "
+                    f"timeout={self.socket_timeout}s | connect_time={timer.total():.2f}ms"
                 )
             except Exception as e:
-                logger.error(f"RedisQueue connection failed: {e}")
+                logger.error(f"RedisQueue connection failed: {e} | connect_time={timer.total():.2f}ms")
                 raise
 
     async def close(self) -> None:

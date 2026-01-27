@@ -55,6 +55,7 @@ class RedisCache(Cache):
         Creates a connection pool that reuses connections (like PgBouncer).
         """
         if self._client is None:
+            timer = Timer()
             try:
                 self._client = await aioredis.from_url(
                     self.redis_url,
@@ -66,11 +67,11 @@ class RedisCache(Cache):
                 )
                 await self._client.ping()
                 logger.info(
-                    f"Redis connected (pool_size={self.max_connections}, "
-                    f"timeout={self.socket_timeout}s)"
+                    f"Redis cache connected | pool_size={self.max_connections} | "
+                    f"timeout={self.socket_timeout}s | connect_time={timer.total():.2f}ms"
                 )
             except Exception as e:
-                logger.error(f"Redis connection failed: {e}")
+                logger.error(f"Redis cache connection failed: {e} | connect_time={timer.total():.2f}ms")
                 raise
 
     async def close(self) -> None:
