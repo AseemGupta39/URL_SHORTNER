@@ -140,16 +140,18 @@ async def get_url_queue() -> Queue:
         async with _url_queue_lock:
             # Double-check: another coroutine may have initialized while we waited
             if _url_queue_instance is None:
-                if not settings.redis_url:
+                # Use separate queue URL if set, otherwise fall back to main redis_url
+                queue_url = settings.redis_queue_url or settings.redis_url
+                if not queue_url:
                     raise RuntimeError(
                         "Redis queue is required for async batch processing architecture. "
-                        "Please set REDIS_URL in your .env file. "
+                        "Please set REDIS_URL (or REDIS_QUEUE_URL for separate instance) in your .env file. "
                         "Example: REDIS_URL=redis://localhost:6379"
                     )
 
-                logger.info("Initializing URL Queue (url_batch_queue)")
+                logger.info(f"Initializing URL Queue (url_batch_queue) on {queue_url}")
                 _url_queue_instance = RedisQueue(
-                    redis_url=settings.redis_url,
+                    redis_url=queue_url,
                     queue_name="url_batch_queue",
                     max_connections=settings.redis_pool_max_connections,
                     socket_timeout=settings.redis_queue_socket_timeout,
@@ -191,16 +193,18 @@ async def get_click_queue() -> Queue:
         async with _click_queue_lock:
             # Double-check: another coroutine may have initialized while we waited
             if _click_queue_instance is None:
-                if not settings.redis_url:
+                # Use separate queue URL if set, otherwise fall back to main redis_url
+                queue_url = settings.redis_queue_url or settings.redis_url
+                if not queue_url:
                     raise RuntimeError(
                         "Redis queue is required for click analytics architecture. "
-                        "Please set REDIS_URL in your .env file. "
+                        "Please set REDIS_URL (or REDIS_QUEUE_URL for separate instance) in your .env file. "
                         "Example: REDIS_URL=redis://localhost:6379"
                     )
 
-                logger.info("Initializing Click Queue (click_batch_queue)")
+                logger.info(f"Initializing Click Queue (click_batch_queue) on {queue_url}")
                 _click_queue_instance = RedisQueue(
-                    redis_url=settings.redis_url,
+                    redis_url=queue_url,
                     queue_name="click_batch_queue",
                     max_connections=settings.redis_pool_max_connections,
                     socket_timeout=settings.redis_queue_socket_timeout,
@@ -230,15 +234,17 @@ async def get_url_dlq() -> Queue:
     if _url_dlq_instance is None:
         async with _url_dlq_lock:
             if _url_dlq_instance is None:
-                if not settings.redis_url:
+                # Use separate queue URL if set, otherwise fall back to main redis_url
+                queue_url = settings.redis_queue_url or settings.redis_url
+                if not queue_url:
                     raise RuntimeError(
                         "Redis queue is required for dead-letter queue. "
-                        "Please set REDIS_URL in your .env file."
+                        "Please set REDIS_URL (or REDIS_QUEUE_URL for separate instance) in your .env file."
                     )
 
-                logger.info("Initializing URL Dead-Letter Queue (url_batch_queue_dlq)")
+                logger.info(f"Initializing URL Dead-Letter Queue (url_batch_queue_dlq) on {queue_url}")
                 _url_dlq_instance = RedisQueue(
-                    redis_url=settings.redis_url,
+                    redis_url=queue_url,
                     queue_name="url_batch_queue_dlq",
                     max_connections=settings.redis_pool_max_connections,
                     socket_timeout=settings.redis_queue_socket_timeout,
@@ -268,15 +274,17 @@ async def get_click_dlq() -> Queue:
     if _click_dlq_instance is None:
         async with _click_dlq_lock:
             if _click_dlq_instance is None:
-                if not settings.redis_url:
+                # Use separate queue URL if set, otherwise fall back to main redis_url
+                queue_url = settings.redis_queue_url or settings.redis_url
+                if not queue_url:
                     raise RuntimeError(
                         "Redis queue is required for dead-letter queue. "
-                        "Please set REDIS_URL in your .env file."
+                        "Please set REDIS_URL (or REDIS_QUEUE_URL for separate instance) in your .env file."
                     )
 
-                logger.info("Initializing Click Dead-Letter Queue (click_batch_queue_dlq)")
+                logger.info(f"Initializing Click Dead-Letter Queue (click_batch_queue_dlq) on {queue_url}")
                 _click_dlq_instance = RedisQueue(
-                    redis_url=settings.redis_url,
+                    redis_url=queue_url,
                     queue_name="click_batch_queue_dlq",
                     max_connections=settings.redis_pool_max_connections,
                     socket_timeout=settings.redis_queue_socket_timeout,

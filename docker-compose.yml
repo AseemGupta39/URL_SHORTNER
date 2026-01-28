@@ -21,14 +21,31 @@ services:
     networks:
       - url-shortener-network
 
-  # Redis Queue
+  # Redis Cache (for URL lookups)
   redis:
     image: redis:7-alpine
-    container_name: url-shortener-redis
+    container_name: url-shortener-redis-cache
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_cache_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - url-shortener-network
+
+  # Redis Queue (for batch processing - separate instance to avoid contention)
+  redis-queue:
+    image: redis:7-alpine
+    container_name: url-shortener-redis-queue
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_queue_data:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -54,14 +71,17 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue (queue is always enabled - just set REDIS_URL)
+      # Redis (cache on :6379, queue on :6380 - separate instances)
       - REDIS_URL=redis://redis:6379
+      - REDIS_QUEUE_URL=redis://redis-queue:6379
       - REDIS_ENABLED=true
 
       # Redis Connection Pooling
       - REDIS_POOL_MAX_CONNECTIONS=100
-      - REDIS_SOCKET_TIMEOUT=5
-      - REDIS_SOCKET_CONNECT_TIMEOUT=5
+      - REDIS_CACHE_SOCKET_TIMEOUT=1
+      - REDIS_CACHE_CONNECT_TIMEOUT=1
+      - REDIS_QUEUE_SOCKET_TIMEOUT=3
+      - REDIS_QUEUE_CONNECT_TIMEOUT=2
 
       # ID Generator
       - DATACENTER_ID=0
@@ -97,6 +117,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      redis-queue:
+        condition: service_healthy
     networks:
       - url-shortener-network
     restart: unless-stopped
@@ -117,14 +139,17 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue (queue is always enabled - just set REDIS_URL)
+      # Redis (cache on :6379, queue on :6380 - separate instances)
       - REDIS_URL=redis://redis:6379
+      - REDIS_QUEUE_URL=redis://redis-queue:6379
       - REDIS_ENABLED=true
 
       # Redis Connection Pooling
       - REDIS_POOL_MAX_CONNECTIONS=100
-      - REDIS_SOCKET_TIMEOUT=5
-      - REDIS_SOCKET_CONNECT_TIMEOUT=5
+      - REDIS_CACHE_SOCKET_TIMEOUT=1
+      - REDIS_CACHE_CONNECT_TIMEOUT=1
+      - REDIS_QUEUE_SOCKET_TIMEOUT=3
+      - REDIS_QUEUE_CONNECT_TIMEOUT=2
 
       # Server
       - HOST=0.0.0.0
@@ -147,6 +172,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      redis-queue:
+        condition: service_healthy
     networks:
       - url-shortener-network
     restart: unless-stopped
@@ -167,8 +194,9 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue (queue is always enabled - just set REDIS_URL)
+      # Redis (cache on :6379, queue on :6380 - separate instances)
       - REDIS_URL=redis://redis:6379
+      - REDIS_QUEUE_URL=redis://redis-queue:6379
       - REDIS_ENABLED=true
       - BATCH_SIZE=100
       - BATCH_INTERVAL_SECONDS=100
@@ -176,8 +204,10 @@ services:
 
       # Redis Connection Pooling
       - REDIS_POOL_MAX_CONNECTIONS=100
-      - REDIS_SOCKET_TIMEOUT=5
-      - REDIS_SOCKET_CONNECT_TIMEOUT=5
+      - REDIS_CACHE_SOCKET_TIMEOUT=1
+      - REDIS_CACHE_CONNECT_TIMEOUT=1
+      - REDIS_QUEUE_SOCKET_TIMEOUT=3
+      - REDIS_QUEUE_CONNECT_TIMEOUT=2
 
       # Server
       - HOST=0.0.0.0
@@ -195,6 +225,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-queue:
         condition: service_healthy
     networks:
       - url-shortener-network
@@ -216,14 +248,17 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue
+      # Redis (cache on :6379, queue on :6380 - separate instances)
       - REDIS_URL=redis://redis:6379
+      - REDIS_QUEUE_URL=redis://redis-queue:6379
       - BATCH_SIZE=100
       - CLICK_BATCH_INTERVAL_SECONDS=5
       - ENABLE_BACKGROUND_SCHEDULER=true
 
       # Redis Connection Pooling
       - REDIS_POOL_MAX_CONNECTIONS=100
+      - REDIS_CACHE_SOCKET_TIMEOUT=1
+      - REDIS_CACHE_CONNECT_TIMEOUT=1
       - REDIS_QUEUE_SOCKET_TIMEOUT=3
       - REDIS_QUEUE_CONNECT_TIMEOUT=2
 
@@ -241,6 +276,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      redis-queue:
+        condition: service_healthy
     networks:
       - url-shortener-network
     restart: unless-stopped
@@ -248,7 +285,9 @@ services:
 volumes:
   postgres_data:
     driver: local
-  redis_data:
+  redis_cache_data:
+    driver: local
+  redis_queue_data:
     driver: local
 
 networks:

@@ -55,7 +55,8 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 3600  # Time to live (1 hour default)
 
     # Redis Configuration (for Upstash Redis)
-    redis_url: str = ""  # Redis connection URL (e.g., redis://localhost:6379 or Upstash URL)
+    redis_url: str = ""  # Redis connection URL for CACHE (e.g., redis://localhost:6379)
+    redis_queue_url: str = ""  # Redis connection URL for QUEUE (defaults to redis_url if not set)
     redis_enabled: bool = False  # Enable Redis cache and queue
 
     # Redis Connection Pooling (like PgBouncer for PostgreSQL)
