@@ -4,6 +4,7 @@ import logging
 
 from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.timer import Timer
+from shared.utils.base_encoder import BaseEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,6 @@ class SnowflakeIDGenerator(IDGenerator):
     Base62 encoding produces 8-character codes
     """
 
-    # Base62 alphabet
-    BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     # Default epoch: 2024-01-01 00:00:00 UTC
 
     def __init__(
@@ -79,6 +78,9 @@ class SnowflakeIDGenerator(IDGenerator):
         self.sequence = 0
         self.last_timestamp = -1
         self._lock = asyncio.Lock()
+
+        # Initialize Base62 encoder with 8-character padding
+        self._encoder = BaseEncoder(base=62, padding=8)
 
         # Log initialization details
         logger.info(
@@ -214,17 +216,7 @@ class SnowflakeIDGenerator(IDGenerator):
         Returns:
             str: Base62 encoded string (8 characters for 47-bit IDs)
         """
-        if num == 0:
-            return self.BASE62_ALPHABET[0].zfill(8)
-
-        result = []
-        while num > 0:
-            result.append(self.BASE62_ALPHABET[num % 62])
-            num //= 62
-
-        # Pad to 8 characters
-        code = ''.join(reversed(result))
-        return code.zfill(8)
+        return self._encoder.encode(num)
 
     def decode_base62(self, code: str) -> int:
         """
@@ -236,10 +228,7 @@ class SnowflakeIDGenerator(IDGenerator):
         Returns:
             int: Decoded number
         """
-        num = 0
-        for char in code:
-            num = num * 62 + self.BASE62_ALPHABET.index(char)
-        return num
+        return self._encoder.decode(code)
 
     def extract_components(self, id_value: int) -> dict:
         """
