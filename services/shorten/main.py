@@ -25,6 +25,7 @@ from services.shorten.config import settings  # Service-specific settings
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
+from shared.middleware.timing_instrumentation import TimingInstrumentationMiddleware
 from shared.config.dependencies import get_url_repository, get_cache, get_url_queue
 from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
 from services.shorten.controllers import url_router
@@ -47,6 +48,9 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json"
 )
+
+# Add Timing Instrumentation middleware (OUTERMOST - must be first)
+app.add_middleware(TimingInstrumentationMiddleware)
 
 # Add Request ID middleware (must be added before CORS)
 app.add_middleware(RequestIDMiddleware)
