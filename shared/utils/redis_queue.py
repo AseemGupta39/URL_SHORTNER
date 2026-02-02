@@ -93,8 +93,17 @@ class RedisQueue(Queue):
         timer = Timer()
         try:
             data_json = json.dumps(data)
+            timer.checkpoint('serialize')
+
             await self._client.rpush(self.queue_name, data_json)  # Push to RIGHT for FIFO
-            logger.debug(f"Enqueued to {self.queue_name} | redis_time={timer.total():.2f}ms")
+            timer.checkpoint('redis_rpush')
+
+            logger.debug(
+                f"Enqueued to {self.queue_name} | "
+                f"total={timer.total():.2f}ms | "
+                f"serialize={timer.elapsed(end='serialize'):.2f}ms | "
+                f"redis_rpush={timer.elapsed(start='serialize', end='redis_rpush'):.2f}ms"
+            )
             return True
 
         except Exception as e:

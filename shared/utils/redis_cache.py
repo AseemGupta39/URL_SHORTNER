@@ -102,26 +102,38 @@ class RedisCache(Cache):
         try:
             full_key = self._make_key(key)
             value = await self._client.get(full_key)
+            timer.checkpoint('redis_get')
 
             if value is None:
                 self._misses += 1
-                logger.debug(f"Cache miss: {key} | redis_time={timer.total():.2f}ms")
+                logger.debug(
+                    f"Cache miss: {key} | "
+                    f"redis_get={timer.elapsed(end='redis_get'):.2f}ms"
+                )
                 return None
 
-            self._hits += 1
-            logger.debug(f"Cache hit: {key} | redis_time={timer.total():.2f}ms")
-
             data_dict = json.loads(value)
+            timer.checkpoint('deserialize')
 
             # Reconstruct URLData if it's a dictionary
             if isinstance(data_dict, dict) and 'short_code' in data_dict:
-                return URLData(
+                result = URLData(
                     short_code=data_dict['short_code'],
                     original_url=data_dict['original_url'],
                     created_at=datetime.fromisoformat(data_dict['created_at'])
                 )
+            else:
+                result = data_dict
 
-            return data_dict
+            self._hits += 1
+            logger.debug(
+                f"Cache hit: {key} | "
+                f"total={timer.total():.2f}ms | "
+                f"redis_get={timer.elapsed(end='redis_get'):.2f}ms | "
+                f"deserialize={timer.elapsed(start='redis_get', end='deserialize'):.2f}ms"
+            )
+
+            return result
 
         except Exception as e:
             logger.error(f"Redis GET error [{key}]: {e} | redis_time={timer.total():.2f}ms")
@@ -156,9 +168,17 @@ class RedisCache(Cache):
                 value_dict = value
 
             value_json = json.dumps(value_dict, default=str)
+            timer.checkpoint('serialize')
 
             await self._client.set(full_key, value_json, ex=self.ttl_seconds)
-            logger.debug(f"Cached: {key} (ttl={self.ttl_seconds}s) | redis_time={timer.total():.2f}ms")
+            timer.checkpoint('redis_set')
+
+            logger.debug(
+                f"Cached: {key} (ttl={self.ttl_seconds}s) | "
+                f"total={timer.total():.2f}ms | "
+                f"serialize={timer.elapsed(end='serialize'):.2f}ms | "
+                f"redis_set={timer.elapsed(start='serialize', end='redis_set'):.2f}ms"
+            )
             return True
 
         except Exception as e:
