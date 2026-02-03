@@ -20,8 +20,8 @@ echo -e "${YELLOW}[1/4] Installing Redis on host...${NC}"
 if command -v redis-cli &> /dev/null; then
     echo -e "${GREEN}✓ Redis already installed${NC}"
 else
-    sudo apt update -qq
-    sudo apt install -y redis-server
+    sudo apt update -qq 2>&1 | grep -v "GPG error\|not signed" || true
+    sudo apt install -y redis-server 2>&1 | grep -v "GPG error\|not signed" || true
     echo -e "${GREEN}✓ Redis installed${NC}"
 fi
 echo ""
