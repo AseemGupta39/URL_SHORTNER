@@ -31,7 +31,7 @@ mkdir -p "$OUTPUT_DIR"
 echo -e "${YELLOW}[1/4] Running warmup request...${NC}"
 curl -X POST "$BASE_URL/v1/shorten" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/warmup"}' \
+  -d '{"original_url": "https://example.com/warmup"}' \
   -s -o /dev/null
 echo -e "${GREEN}✓ Warmup complete${NC}"
 sleep 2
