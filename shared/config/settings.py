@@ -186,8 +186,8 @@ class Settings(BaseSettings):
         """Validate Redis pool size is reasonable."""
         if v <= 0:
             raise ValueError("redis_pool_max_connections must be positive")
-        if v > 1000:
-            raise ValueError("redis_pool_max_connections should not exceed 1000")
+        if v > 10000:
+            raise ValueError("redis_pool_max_connections should not exceed 10000")
         return v
 
     class Config:
