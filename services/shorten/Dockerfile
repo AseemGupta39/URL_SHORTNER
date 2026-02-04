@@ -2,9 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (redis-server for in-container sidecar test)
 RUN apt-get update && apt-get install -y \
     gcc \
+    redis-server \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project root files needed for shared modules
@@ -27,5 +28,7 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
 
-# Run the service
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Startup: boots Redis sidecar on loopback, then uvicorn
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+CMD ["/app/start.sh"]

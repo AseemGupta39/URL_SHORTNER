@@ -55,8 +55,8 @@ services:
       - DB_POOL_PRE_PING=true
       - DB_ECHO_POOL=false
 
-      # Redis & Queue (queue is always enabled - just set REDIS_URL)
-      - REDIS_URL=redis://172.17.0.1:6379
+      # Redis & Queue - in-container sidecar for pool vs network isolation test
+      - REDIS_URL=redis://127.0.0.1:6379
       - REDIS_ENABLED=true
 
       # Redis Connection Pooling (increased for load testing)
