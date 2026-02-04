@@ -27,7 +27,7 @@ class URLQueueMessage(BaseModel):
             short_code=short_code,
             original_url=original_url,
             created_at=created_at.isoformat(),
-            request_id=request_context.get_request_id()
+            request_id=request_context.get_request_id() or request_context.generate_request_id()
         )
 
     def to_dict(self) -> dict:
@@ -75,7 +75,7 @@ class ClickQueueMessage(BaseModel):
             ip_address=ip_address,
             user_agent=user_agent,
             referrer=referrer,
-            request_id=request_context.get_request_id()
+            request_id=request_context.get_request_id() or request_context.generate_request_id()
         )
 
     def to_dict(self) -> dict:
