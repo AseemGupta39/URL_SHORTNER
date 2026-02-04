@@ -49,14 +49,10 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Add Timing Instrumentation middleware (OUTERMOST - must be first)
-app.add_middleware(TimingInstrumentationMiddleware)
-
-# Add Request ID middleware (must be added before CORS)
-app.add_middleware(RequestIDMiddleware)
-
-# Add Prometheus metrics middleware
-app.add_middleware(PrometheusMiddleware, service_name="shorten")
+# TEMPORARILY DISABLED FOR PERFORMANCE TESTING - re-enable after test
+# app.add_middleware(TimingInstrumentationMiddleware)
+# app.add_middleware(RequestIDMiddleware)
+# app.add_middleware(PrometheusMiddleware, service_name="shorten")
 
 # Configure CORS
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
