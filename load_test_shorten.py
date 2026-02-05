@@ -10,26 +10,30 @@ import time
 import json
 
 
-API_URL = "http://localhost:8001/v1/shorten"
+BASE_URL = "http://localhost:8001"
 
 
-async def send_single_request(session, request_id):
+async def send_single_request(session, request_id, endpoint="shorten"):
     """
-    Send one POST request to /v1/shorten and measure its latency.
-
-    Returns a dict with request_id, status, body, duration_ms
+    Send one request and measure its latency.
+    endpoint: "shorten" -> POST /v1/shorten | "health" -> GET /health
     """
     start_ts = time.time()
-    payload = {
-        "original_url": f"https://example.com/test-{request_id}-{int(time.time() * 1000)}"
-    }
 
     try:
-        async with session.post(
-            API_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"}
-        ) as response:
+        if endpoint == "health":
+            ctx = session.get(f"{BASE_URL}/health")
+        else:
+            payload = {
+                "original_url": f"https://example.com/test-{request_id}-{int(time.time() * 1000)}"
+            }
+            ctx = session.post(
+                f"{BASE_URL}/v1/shorten",
+                json=payload,
+                headers={"Content-Type": "application/json"}
+            )
+
+        async with ctx as response:
             resp_text = await response.text()
             end_ts = time.time()
             return {
@@ -48,21 +52,21 @@ async def send_single_request(session, request_id):
         }
 
 
-async def run_load_test(total_requests):
+async def run_load_test(total_requests, endpoint="shorten"):
     if total_requests <= 0:
         raise ValueError("total_requests must be > 0")
 
     # First, do a warmup request
     print("Running warmup request...")
     async with aiohttp.ClientSession() as session:
-        await send_single_request(session, 0)
+        await send_single_request(session, 0, endpoint)
     print("Warmup complete\n")
 
     await asyncio.sleep(1)
 
     # Now run the actual load test
     async with aiohttp.ClientSession() as session:
-        tasks = [send_single_request(session, i) for i in range(1, total_requests + 1)]
+        tasks = [send_single_request(session, i, endpoint) for i in range(1, total_requests + 1)]
 
         print(f"Starting load test with {total_requests} concurrent requests...\n")
         start = time.time()
@@ -115,13 +119,18 @@ async def run_load_test(total_requests):
 def main():
     print("URL Shortener Load Test")
     print("-" * 60)
+    print("Endpoints: 1) /v1/shorten  2) /health")
+    choice = input("Pick endpoint (default 1): ").strip() or "1"
+    endpoint = "health" if choice == "2" else "shorten"
+    print(f"Testing: {'GET /health' if endpoint == 'health' else 'POST /v1/shorten'}\n")
+
     try:
         total_requests = int(input("Enter number of concurrent requests (default 1000): ") or "1000")
     except ValueError:
         print("Invalid input, using default: 1000")
         total_requests = 1000
 
-    responses = asyncio.run(run_load_test(total_requests))
+    responses = asyncio.run(run_load_test(total_requests, endpoint))
 
 
 if __name__ == "__main__":
