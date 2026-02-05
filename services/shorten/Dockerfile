@@ -29,6 +29,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
 
 # Startup: boots Redis sidecar on loopback, then uvicorn
-COPY start.sh /app/start.sh
+COPY services/shorten/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 CMD ["/app/start.sh"]
