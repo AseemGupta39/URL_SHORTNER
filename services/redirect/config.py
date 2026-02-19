@@ -23,6 +23,10 @@ class RedirectServiceSettings(BaseSettings):
     port: int = 8002
     reload: bool = True
 
+    # Concurrency limiter (semaphore) — limits requests in flight at once
+    # 0 = unlimited. Tune per hardware: 50-100 for Docker/constrained, 500+ for bare metal
+    max_concurrent_requests: int = 100
+
     # CORS Configuration (redirects work from anywhere)
     cors_origins: str = "*"
 
