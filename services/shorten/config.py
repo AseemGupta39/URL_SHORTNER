@@ -39,6 +39,10 @@ class ShortenServiceSettings(BaseSettings):
     port: int = 8001
     reload: bool = True
 
+    # Concurrency limiter (semaphore) — limits requests in flight at once
+    # 0 = unlimited. Tune per hardware: 50-100 for Docker/constrained, 500+ for bare metal
+    max_concurrent_requests: int = 100
+
     # CORS Configuration
     cors_origins: str = "http://localhost:5500,http://127.0.0.1:5500"
 
