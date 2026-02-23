@@ -8,6 +8,7 @@ import asyncio
 from shared.config.settings import settings
 from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
+from shared.utils.id_buffer import IDBuffer
 from shared.data.repositories import URLRepository, SQLiteURLRepository
 from shared.data.interfaces.click_repository import ClickRepository
 from shared.data.repositories.click_repository import SQLiteClickRepository
@@ -440,3 +441,65 @@ async def get_click_analytics_service(
                 )
 
     return _click_analytics_service_instance
+
+
+# ---------------------------------------------------------------------------
+# IDBuffer lifecycle — startup init and hot-path getter
+# ---------------------------------------------------------------------------
+
+_id_buffer_instance: IDBuffer | None = None
+
+
+async def init_id_buffer(size: int = 2000, refill_threshold: int = 700) -> IDBuffer:
+    """
+    Create and start the global IDBuffer singleton.
+    Must be called once in the service startup event before serving requests.
+
+    Persist path is auto-derived from settings.datacenter_id and settings.worker_id
+    to guarantee a unique file per worker process — prevents race condition when
+    multiple workers share the same filesystem (e.g. 4 uvicorn workers on same machine).
+
+    Expected input:
+        - size (int): max IDs to pre-generate (default 1000)
+        - refill_threshold (int): refill when queue drops below this (default 200)
+
+    Expected output:
+        - IDBuffer: the started buffer instance
+    """
+    global _id_buffer_instance
+
+    # Guard: avoid double-init if startup hook fires twice
+    if _id_buffer_instance is not None:
+        logger.warning("init_id_buffer: buffer already initialized, skipping")
+        return _id_buffer_instance
+
+    # Per-worker unique path — dc and worker ids are set per process via env vars
+    persist_path = (
+        f"/tmp/id_buffer_dc{settings.datacenter_id}_w{settings.worker_id}.txt"
+    )
+
+    generator = await get_id_generator()
+    _id_buffer_instance = IDBuffer(
+        generator=generator,
+        size=size,
+        refill_threshold=refill_threshold,
+        persist_path=persist_path,
+    )
+    await _id_buffer_instance.start()
+    return _id_buffer_instance
+
+
+async def get_id_buffer() -> IDBuffer:
+    """
+    Get the global IDBuffer singleton for FastAPI dependency injection.
+    Raises RuntimeError if called before init_id_buffer() on startup.
+
+    Expected output:
+        - IDBuffer: the running buffer instance
+    """
+    if _id_buffer_instance is None:
+        raise RuntimeError(
+            "IDBuffer is not initialized. "
+            "Ensure init_id_buffer() is called in the service startup event."
+        )
+    return _id_buffer_instance

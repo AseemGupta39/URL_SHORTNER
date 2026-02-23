@@ -13,6 +13,7 @@ from shared.data.repositories import URLRepository
 from shared.utils.interfaces.id_generator import IDGenerator
 from shared.utils.interfaces.cache import Cache
 from shared.utils.interfaces.queue import Queue
+from shared.utils.id_buffer import IDBuffer
 from shared.core.exceptions import ShortCodeNotFoundException
 from shared.utils.timer import Timer
 from shared.middleware.metrics import (

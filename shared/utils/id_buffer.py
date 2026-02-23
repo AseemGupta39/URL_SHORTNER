@@ -44,8 +44,8 @@ class IDBuffer:
     def __init__(
         self,
         generator: IDGenerator,
-        size: int = 1000,
-        refill_threshold: int = 200,
+        size: int = 2000,
+        refill_threshold: int = 700,
         persist_path: str = "/tmp/id_buffer.txt",
     ) -> None:
         """
