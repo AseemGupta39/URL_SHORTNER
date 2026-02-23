@@ -16,6 +16,7 @@ load_dotenv(env_file, override=True)
 project_root = service_dir.parent.parent
 sys.path.insert(0, str(project_root))
 
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,6 +29,24 @@ from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_url_repository, get_cache, get_url_queue
 from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
 from services.shorten.controllers import url_router
+
+QUEUE_DEPTH_POLL_INTERVAL = 10  # seconds
+
+
+async def _poll_queue_depth() -> None:
+    """Background task: logs queue depth every QUEUE_DEPTH_POLL_INTERVAL seconds.
+
+    Runs for the lifetime of the service. Errors are logged but never crash the poller —
+    a transient Redis blip should not kill the monitoring loop.
+    """
+    while True:
+        await asyncio.sleep(QUEUE_DEPTH_POLL_INTERVAL)
+        try:
+            queue = await get_url_queue()
+            depth = await queue.size()
+            logger.info(f"Queue depth: {depth}")
+        except Exception as e:
+            logger.error(f"Queue depth poll failed: {e}")
 
 # Setup per-service logging
 setup_logging(
@@ -168,6 +187,13 @@ async def queue_health_check() -> dict:
 async def metrics() -> str:
     """Expose Prometheus metrics."""
     return metrics_endpoint()
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    """Start background tasks on service startup."""
+    asyncio.create_task(_poll_queue_depth())
+    logger.info(f"Queue depth poller started (interval={QUEUE_DEPTH_POLL_INTERVAL}s)")
+
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:

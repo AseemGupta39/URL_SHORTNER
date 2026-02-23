@@ -140,8 +140,7 @@ class URLService:
                 )
                 queue_success = False
             elif queue_success:
-                queue_size = await self.queue.size()
-                logger.debug(f"Queue ENQUEUE successful: short_code={short_code} | queue_depth={queue_size}")
+                logger.debug(f"Queue ENQUEUE successful: short_code={short_code}")
                 track_queue_operation(QueueOperation.ENQUEUE, self.service_name)
             else:
                 logger.error(f"Queue ENQUEUE failed: short_code={short_code}", exc_info=True)
