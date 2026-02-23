@@ -46,7 +46,8 @@ class URLService:
         queue: Queue,
         base_domain: str = "short.ly",
         base_url_scheme: str = "https",
-        service_name: str = "shorten"
+        service_name: str = "shorten",
+        id_buffer: Optional[IDBuffer] = None,
     ):
         """
         Initialize URL service.
@@ -59,6 +60,10 @@ class URLService:
             base_domain: Base domain for constructing short URLs
             base_url_scheme: URL scheme (http or https)
             service_name: Service name for metrics (shorten/redirect/batch_processor)
+            id_buffer: Pre-generation buffer for lock-free ID hot path (optional).
+                       When provided, shorten() calls buffer.get() (~0ms, no lock).
+                       Falls back to id_generator.generate_short_code() if None
+                       (redirect and batch_processor services do not shorten URLs).
         """
         self.url_repo = url_repo
         self.id_generator = id_generator
@@ -67,6 +72,7 @@ class URLService:
         self.base_domain = base_domain
         self.base_url_scheme = base_url_scheme
         self.service_name = service_name
+        self.id_buffer = id_buffer
 
     async def shorten(self, original_url: HttpUrl) -> ShortenResponse:
         """
@@ -89,8 +95,12 @@ class URLService:
         logger.info(f"Shortening URL: {original_url}")
 
         try:
-            # Generate short code
-            short_code = await self.id_generator.generate_short_code()
+            # Generate short code — use pre-generation buffer (lock-free, ~0ms) when
+            # available, fall back to direct generator (acquires asyncio.Lock) otherwise.
+            if self.id_buffer is not None:
+                short_code = await self.id_buffer.get()
+            else:
+                short_code = await self.id_generator.generate_short_code()
             timer.checkpoint('id_gen')
             logger.debug(f"Generated short_code={short_code} for url={original_url} | id_gen_time={timer.elapsed(end='id_gen'):.2f}ms")
 

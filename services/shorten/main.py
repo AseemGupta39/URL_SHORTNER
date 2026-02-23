@@ -190,7 +190,12 @@ async def metrics() -> str:
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """Start background tasks on service startup."""
+    """Warm ID buffer and start background tasks on service startup."""
+    from shared.config.dependencies import init_id_buffer
+    await init_id_buffer(
+        size=settings.id_buffer_size,
+        refill_threshold=settings.id_buffer_refill_threshold,
+    )
     asyncio.create_task(_poll_queue_depth())
     logger.info(f"Queue depth poller started (interval={QUEUE_DEPTH_POLL_INTERVAL}s)")
 
@@ -202,13 +207,13 @@ async def shutdown_event() -> None:
 
     # Close singletons via dependency injection getters
     from shared.config.dependencies import (
-        _url_repo_instance,
+        _url_repository_instance,
         _cache_instance,
         _url_queue_instance
     )
 
-    if _url_repo_instance:
-        await _url_repo_instance.close()
+    if _url_repository_instance:
+        await _url_repository_instance.close()
         logger.debug("URL repository closed")
 
     if _cache_instance:

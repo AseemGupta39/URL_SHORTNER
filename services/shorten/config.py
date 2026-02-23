@@ -43,6 +43,11 @@ class ShortenServiceSettings(BaseSettings):
     # 0 = unlimited. Tune per hardware: 50-100 for Docker/constrained, 500+ for bare metal
     max_concurrent_requests: int = 100
 
+    # ID Buffer — pre-generates short codes off the hot path to eliminate lock contention
+    # refill_threshold: background refill triggers when queue drops below this
+    id_buffer_size: int = 4000
+    id_buffer_refill_threshold: int = 2000
+
     # CORS Configuration
     cors_origins: str = "http://localhost:5500,http://127.0.0.1:5500"
 

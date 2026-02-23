@@ -352,7 +352,9 @@ async def get_url_service(
     - Double-checked locking pattern for performance
 
     Returns:
-        URLService with cache-first and queue-based batch processing
+        URLService with cache-first and queue-based batch processing.
+        id_buffer is injected if already initialized (shorten service startup),
+        otherwise None (redirect/batch_processor services skip ID generation).
     """
     global _url_service_instance
 
@@ -366,7 +368,8 @@ async def get_url_service(
                     cache=cache,
                     queue=queue,
                     base_domain=settings.base_domain,
-                    base_url_scheme=settings.base_url_scheme
+                    base_url_scheme=settings.base_url_scheme,
+                    id_buffer=_id_buffer_instance,
                 )
 
     return _url_service_instance

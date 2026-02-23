@@ -93,6 +93,10 @@ services:
 
       # Concurrency limiter — tune for hardware (50-100 Docker, 500+ bare metal)
       - MAX_CONCURRENT_REQUESTS=100
+
+      # ID Buffer — pre-generates short codes off hot path (lock-free get)
+      - ID_BUFFER_SIZE=4000
+      - ID_BUFFER_REFILL_THRESHOLD=2000
     ports:
       - "8001:8001"
     depends_on:
