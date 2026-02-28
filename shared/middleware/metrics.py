@@ -5,13 +5,11 @@ Tracks HTTP requests, response times, and exposes /metrics endpoint.
 Provides helper functions for service-layer metrics (cache, DB, queue, business events).
 """
 import logging
-from typing import Callable
 
 from shared.utils.timer import Timer
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Scope, Receive, Send
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
 
 from shared.middleware.metrics_definitions import (
     http_requests_total,
@@ -36,81 +34,67 @@ from shared.middleware.metrics_enums import (
 logger = logging.getLogger(__name__)
 
 
-class PrometheusMiddleware(BaseHTTPMiddleware):
+class PrometheusMiddleware:
     """
-    Middleware to track HTTP request metrics.
+    Middleware to track HTTP request metrics — pure ASGI, no BaseHTTPMiddleware.
 
     Tracks request count, duration, and status codes per endpoint/method.
     """
 
-    def __init__(self, app: ASGIApp, service_name: str):
-        """
-        Initialize Prometheus middleware.
-
-        Args:
-            app: ASGI application
-            service_name: Name of the service (shorten/redirect/batch_processor)
-        """
+    def __init__(self, app: ASGIApp, service_name: str) -> None:
         if not service_name:
             raise ValueError("service_name required")
-
-        super().__init__(app)
+        self.app = app
         self.service_name = service_name
         logger.info(f"Prometheus metrics initialized: service={service_name}")
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Track HTTP request metrics."""
-        # Skip metrics endpoint itself
-        if request.url.path == "/metrics":
-            return await call_next(request)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-        endpoint = request.url.path
-        method = request.method
+        path = scope["path"]
+
+        # Skip metrics endpoint itself
+        if path == "/metrics":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope["method"]
         timer = Timer()
+        status_code = 500
+
+        async def send_wrapper(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
 
         try:
-            response = await call_next(request)
-            duration = timer.total()  # milliseconds
-            duration_seconds = duration / 1000  # Prometheus expects seconds
-
-            # Record success metrics
-            http_requests_total.labels(
-                method=method,
-                endpoint=endpoint,
-                status_code=response.status_code,
-                service=self.service_name
-            ).inc()
-
-            http_request_duration_seconds.labels(
-                method=method,
-                endpoint=endpoint,
-                service=self.service_name
-            ).observe(duration_seconds)
-
-            logger.debug(
-                f"HTTP metric: method={method} | endpoint={endpoint} | "
-                f"status={response.status_code} | duration={duration:.2f}ms"
-            )
-
-            return response
-
+            await self.app(scope, receive, send_wrapper)
         except Exception as e:
-            duration = timer.total()  # milliseconds
-
-            # Record error metrics
+            duration = timer.total()
             http_requests_total.labels(
-                method=method,
-                endpoint=endpoint,
-                status_code=500,
-                service=self.service_name
+                method=method, endpoint=path, status_code=500, service=self.service_name
             ).inc()
-
             logger.error(
-                f"HTTP error: method={method} | endpoint={endpoint} | "
+                f"HTTP error: method={method} | endpoint={path} | "
                 f"duration={duration:.2f}ms | error={str(e)}",
                 exc_info=True
             )
             raise
+        else:
+            duration = timer.total()
+            http_requests_total.labels(
+                method=method, endpoint=path, status_code=status_code, service=self.service_name
+            ).inc()
+            http_request_duration_seconds.labels(
+                method=method, endpoint=path, service=self.service_name
+            ).observe(duration / 1000)
+            logger.debug(
+                f"HTTP metric: method={method} | endpoint={path} | "
+                f"status={status_code} | duration={duration:.2f}ms"
+            )
 
 
 def metrics_endpoint() -> Response:
