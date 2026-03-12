@@ -180,3 +180,15 @@ async def test_resolve_passes_correct_short_code_to_db(service, mock_cache, mock
     await service.resolve("mycode1")
 
     mock_repository.get_by_short_code.assert_called_once_with("mycode1")
+
+
+# ---------------------------------------------------------------------------
+# Cache get_async raises an exception (not just returns None)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_cache_get_exception_propagates(service, mock_cache):
+    mock_cache.get_async = AsyncMock(side_effect=Exception("Redis connection lost"))
+
+    with pytest.raises(Exception, match="Redis connection lost"):
+        await service.resolve("abc12345")

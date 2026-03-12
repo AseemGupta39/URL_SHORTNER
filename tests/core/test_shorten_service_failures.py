@@ -182,3 +182,50 @@ async def test_short_url_uses_correct_scheme_and_domain(_, mock_repository, mock
 async def test_response_created_at_is_datetime(_, service):
     result = await service.shorten(HttpUrl("https://example.com"))
     assert isinstance(result.created_at, datetime)
+
+
+# ---------------------------------------------------------------------------
+# Nested failure: cache rollback itself fails
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@patch("shared.utils.request_context.get_request_id", return_value="req-test")
+async def test_cache_rollback_failure_still_raises_original_db_error(_, service, mock_queue, mock_repository, mock_cache):
+    """Even if cache delete fails, the original DB error is still raised."""
+    mock_queue.enqueue = AsyncMock(return_value=False)
+    mock_repository.batch_create = AsyncMock(side_effect=Exception("DB error"))
+    mock_cache.set_async = AsyncMock(return_value=True)
+    mock_cache.delete_async = AsyncMock(return_value=False)  # rollback also fails
+
+    with pytest.raises(Exception, match="DB error"):
+        await service.shorten(HttpUrl("https://example.com"))
+
+    mock_cache.delete_async.assert_called_once_with("abc12345")
+
+
+# ---------------------------------------------------------------------------
+# ID generation fails before short_code is assigned (NameError branch)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+@patch("shared.utils.request_context.get_request_id", return_value="req-test")
+async def test_id_buffer_exception_before_short_code_assigned_raises(_, mock_repository, mock_cache, mock_queue):
+    """When id_buffer.get() raises, short_code is never set — NameError branch in except."""
+    buf = AsyncMock()
+    buf.get = AsyncMock(side_effect=RuntimeError("buffer drained"))
+
+    svc = ShortenService(
+        url_repo=mock_repository,
+        cache=mock_cache,
+        queue=mock_queue,
+        id_buffer=buf,
+        base_domain="short.ly",
+        base_url_scheme="https",
+    )
+
+    with pytest.raises(RuntimeError, match="buffer drained"):
+        await svc.shorten(HttpUrl("https://example.com"))
+
+    # Cache and queue should never have been touched
+    mock_cache.set_async.assert_not_called()
+    mock_queue.enqueue.assert_not_called()

@@ -339,3 +339,77 @@ async def test_load_persisted_handles_os_error_gracefully(tmp_path_dir=None):
     # FileNotFoundError path → returns 0
     loaded = await buf._load_persisted()
     assert loaded == 0
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_load_persisted_empty_file_returns_zero():
+    path = tmp_path()
+    open(path, "w").close()  # create empty file
+
+    gen = make_generator()
+    buf = IDBuffer(generator=gen, size=10, refill_threshold=3, persist_path=path)
+    loaded = await buf._load_persisted()
+    assert loaded == 0
+
+    os.unlink(path)
+
+
+@pytest.mark.asyncio
+async def test_load_persisted_caps_at_buffer_capacity():
+    """If persist file has more IDs than size, only loads up to capacity."""
+    path = tmp_path()
+    with open(path, "w") as f:
+        # Write 20 IDs but buffer size is only 5
+        f.write("\n".join(f"code{i:04d}" for i in range(20)))
+
+    gen = make_generator()
+    buf = IDBuffer(generator=gen, size=5, refill_threshold=1, persist_path=path)
+    loaded = await buf._load_persisted()
+
+    assert loaded == 5
+    assert buf._queue.qsize() == 5
+
+    os.unlink(path)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_get_all_return_unique_codes():
+    """Multiple concurrent get() calls each receive a unique code."""
+    gen = make_generator()
+    path = tmp_path()
+    buf = IDBuffer(generator=gen, size=50, refill_threshold=10, persist_path=path)
+    await buf.start()
+    try:
+        tasks = [buf.get() for _ in range(20)]
+        codes = await asyncio.gather(*tasks)
+        assert len(set(codes)) == 20
+    finally:
+        await buf.stop()
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+@pytest.mark.asyncio
+async def test_refill_loop_triggers_when_below_threshold():
+    """After draining below threshold, background loop refills the buffer."""
+    gen = make_generator()
+    path = tmp_path()
+    buf = IDBuffer(generator=gen, size=20, refill_threshold=10, persist_path=path)
+    await buf.start()
+    try:
+        # Drain well below threshold
+        for _ in range(15):
+            await buf.get()
+
+        # Give refill loop time to run (it checks every 50ms)
+        await asyncio.sleep(0.2)
+
+        assert buf._queue.qsize() > 0
+    finally:
+        await buf.stop()
+        if os.path.exists(path):
+            os.unlink(path)
