@@ -85,7 +85,8 @@ async def test_queue_message_to_url_data():
     msg = URLQueueMessage(
         short_code="abc123",
         original_url="https://example.com",
-        created_at=datetime.now().isoformat()
+        created_at=datetime.now().isoformat(),
+        request_id="test-request-id"
     )
 
     url_data = URLData(
@@ -106,7 +107,8 @@ async def test_dequeue_and_process_batch(mock_queue, mock_repository):
         {
             "short_code": f"code{i}",
             "original_url": f"https://example{i}.com",
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            "request_id": "test-request-id"
         }
         for i in range(5)
     ]
@@ -145,7 +147,8 @@ async def test_process_batch_with_invalid_message(mock_queue):
         {
             "short_code": "valid1",
             "original_url": "https://example.com",
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            "request_id": "test-request-id"
         },
         {
             "invalid": "message"
@@ -153,7 +156,8 @@ async def test_process_batch_with_invalid_message(mock_queue):
         {
             "short_code": "valid2",
             "original_url": "https://google.com",
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
+            "request_id": "test-request-id"
         }
     ]
 

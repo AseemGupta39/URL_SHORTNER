@@ -254,7 +254,7 @@ class TestSnowflakeIDGenerator:
         assert isinstance(code, str)
         assert len(code) == 8
         # Should only contain base62 characters
-        assert all(c in generator.BASE62_ALPHABET for c in code)
+        assert all(c in generator._encoder._alphabet for c in code)
 
     @pytest.mark.asyncio
     async def test_short_codes_unique(self):
@@ -445,7 +445,7 @@ class TestSnowflakeIDGenerator:
 
             # Verify code format
             assert len(short_code) == 8
-            assert all(c in generator.BASE62_ALPHABET for c in short_code)
+            assert all(c in generator._encoder._alphabet for c in short_code)
 
         assert len(url_mappings) == 1000
 
@@ -480,7 +480,7 @@ class TestSnowflakeIDGenerator:
     def test_base62_alphabet_correct(self):
         """Test base62 alphabet is correct"""
         generator = SnowflakeIDGenerator(datacenter_id=0, worker_id=0, epoch_sec=TEST_EPOCH_SEC)
-        alphabet = generator.BASE62_ALPHABET
+        alphabet = generator._encoder._alphabet
 
         assert len(alphabet) == 62
         assert alphabet == "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"

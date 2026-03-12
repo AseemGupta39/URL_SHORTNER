@@ -12,28 +12,26 @@ from shared.core.schemas import ShortenResponse
 
 
 @pytest.fixture
-def mock_url_service():
-    """Mock URLService for testing API layer."""
+def mock_shorten_service():
+    """Mock ShortenService for testing API layer."""
     return AsyncMock()
 
 
 @pytest.fixture
-def test_client(mock_url_service):
-    """Create test client with mocked URLService."""
-    # Import app here to avoid import issues
+def test_client(mock_shorten_service):
+    """Create test client with mocked ShortenService."""
     import sys
     from pathlib import Path
     project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root))
 
-    # Mock the dependency to return our mock service directly
-    def override_get_url_service():
-        return mock_url_service
+    def override_get_shorten_service():
+        return mock_shorten_service
 
     from services.shorten.main import app
-    from shared.config.dependencies import get_url_service
+    from shared.config.dependencies import get_shorten_service
 
-    app.dependency_overrides[get_url_service] = override_get_url_service
+    app.dependency_overrides[get_shorten_service] = override_get_shorten_service
     client = TestClient(app)
     yield client
     app.dependency_overrides.clear()
@@ -51,9 +49,9 @@ def test_health_check(test_client):
     assert "worker_id" in data
 
 
-def test_shorten_url_success(test_client, mock_url_service):
+def test_shorten_url_success(test_client, mock_shorten_service):
     """Test successful URL shortening."""
-    mock_url_service.shorten.return_value = ShortenResponse(
+    mock_shorten_service.shorten.return_value = ShortenResponse(
         short_code="abc1234",
         short_url="https://short.ly/abc1234",
         created_at=datetime.now()
@@ -70,12 +68,12 @@ def test_shorten_url_success(test_client, mock_url_service):
     assert data["short_url"] == "https://short.ly/abc1234"
     assert "created_at" in data
 
-    mock_url_service.shorten.assert_called_once()
+    mock_shorten_service.shorten.assert_called_once()
 
 
-def test_shorten_url_with_query_params(test_client, mock_url_service):
+def test_shorten_url_with_query_params(test_client, mock_shorten_service):
     """Test shortening URL with query parameters."""
-    mock_url_service.shorten.return_value = ShortenResponse(
+    mock_shorten_service.shorten.return_value = ShortenResponse(
         short_code="query01",
         short_url="https://short.ly/query01",
         created_at=datetime.now()
@@ -111,9 +109,9 @@ def test_shorten_url_missing_url(test_client):
     assert response.status_code == 422
 
 
-def test_shorten_url_http_url(test_client, mock_url_service):
+def test_shorten_url_http_url(test_client, mock_shorten_service):
     """Test shortening HTTP (non-HTTPS) URL."""
-    mock_url_service.shorten.return_value = ShortenResponse(
+    mock_shorten_service.shorten.return_value = ShortenResponse(
         short_code="http123",
         short_url="https://short.ly/http123",
         created_at=datetime.now()

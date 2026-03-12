@@ -174,24 +174,12 @@ async def shutdown_event() -> None:
     """Close singleton resources on shutdown to prevent leaks."""
     logger.info("Redirect Service shutting down - closing connections")
 
-    # Close singletons via dependency injection getters
-    from shared.config.dependencies import (
-        _url_repository_instance,
-        _cache_instance,
-        _click_queue_instance
-    )
-
-    if _url_repository_instance:
-        await _url_repository_instance.close()
-        logger.debug("URL repository closed")
-
-    if _cache_instance:
-        await _cache_instance.close()
-        logger.debug("Cache connection closed")
-
-    if _click_queue_instance:
-        await _click_queue_instance.close()
-        logger.debug("Click queue connection closed")
+    from shared.config.dependencies import _instances
+    for key in ("url_repository", "cache", "click_queue"):
+        instance = _instances.get(key)
+        if instance and hasattr(instance, "close"):
+            await instance.close()
+            logger.debug(f"{key} closed")
 
     logger.info("Redirect Service shutdown complete")
 

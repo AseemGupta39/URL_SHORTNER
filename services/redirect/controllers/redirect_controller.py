@@ -9,9 +9,9 @@ from fastapi.responses import RedirectResponse as FastAPIRedirect
 import logging
 import re
 
-from shared.core.services import URLService
+from shared.core.services import ResolveService
 from shared.core.services.click_analytics_service import ClickAnalyticsService
-from shared.config.dependencies import get_url_service, get_click_analytics_service
+from shared.config.dependencies import get_resolve_service, get_click_analytics_service
 from shared.core.exceptions import ShortCodeNotFoundException
 from services.redirect.config import settings
 
@@ -35,7 +35,7 @@ logger.info(f"Concurrency limiter: {settings.max_concurrent_requests or 'unlimit
 async def redirect_url(
     short_code: str,
     request: Request,
-    url_service: URLService = Depends(get_url_service),
+    url_service: ResolveService = Depends(get_resolve_service),
     click_service: ClickAnalyticsService = Depends(get_click_analytics_service)
 ):
     """

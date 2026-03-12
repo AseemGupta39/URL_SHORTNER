@@ -19,13 +19,14 @@ import os
 os.environ['REDIS_ENABLED'] = 'true'
 os.environ['REDIS_URL'] = 'rediss://default:AW1fAAIncDI0NTIzMTIxNGYzMmE0ZjdjOGU1OGVmYWQ2OTVlYWU4OXAyMjc5OTk@safe-gecko-27999.upstash.io:6379'
 
-from shared.core.services import URLService
+from shared.core.services import ShortenService, ResolveService
 from shared.core.schemas import URLData
 from shared.core.exceptions import ShortCodeNotFoundException
 from shared.data.repositories import SQLiteURLRepository
 from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.utils.redis_cache import RedisCache
 from shared.utils.redis_queue import RedisQueue
+from shared.utils.request_context import set_request_id, generate_request_id
 
 
 @pytest.mark.asyncio
@@ -65,15 +66,22 @@ async def test_comprehensive_end_to_end_flow():
     repo = SQLiteURLRepository(db_url="sqlite+aiosqlite:///:memory:")
     await repo.initialize()
 
+    from shared.utils.id_buffer import IDBuffer
     id_gen = SnowflakeIDGenerator(datacenter_id=1, worker_id=1)
+    id_buffer = IDBuffer(generator=id_gen, size=100, refill_threshold=20)
+    await id_buffer.start()
 
-    service = URLService(
+    service = ShortenService(
         url_repo=repo,
-        id_generator=id_gen,
         cache=cache,
         queue=queue,
+        id_buffer=id_buffer,
         base_domain="short.test",
-        base_url_scheme="https"
+        base_url_scheme="https",
+    )
+    resolve_service = ResolveService(
+        url_repo=repo,
+        cache=cache,
     )
 
     print("✓ All components initialized")
@@ -100,6 +108,7 @@ async def test_comprehensive_end_to_end_flow():
         shortened_results = []
         short_codes = []
 
+        set_request_id(generate_request_id())
         for i, url in enumerate(test_urls, 1):
             result = await service.shorten(HttpUrl(url))
             shortened_results.append(result)
@@ -183,7 +192,7 @@ async def test_comprehensive_end_to_end_flow():
 
         redirect_count = 0
         for i, short_code in enumerate(short_codes[:5], 1):  # Test first 5
-            result = await service.resolve(short_code)
+            result = await resolve_service.resolve(short_code)
             # Normalize URLs for comparison (Pydantic HttpUrl adds trailing slash)
             assert str(result.original_url).rstrip('/') == test_urls[i-1].rstrip('/')
             redirect_count += 1
@@ -207,7 +216,7 @@ async def test_comprehensive_end_to_end_flow():
         print(f"  ✓ Cache miss confirmed")
 
         # Redirect should query DB and warm cache
-        result = await service.resolve(test_short_code)
+        result = await resolve_service.resolve(test_short_code)
         # Normalize URLs for comparison
         assert str(result.original_url).rstrip('/') == test_urls[5].rstrip('/')
         print(f"  ✓ Redirect successful: {test_short_code} → {str(result.original_url)[:50]}")
@@ -224,7 +233,7 @@ async def test_comprehensive_end_to_end_flow():
 
         fake_code = "NONEXISTENT"
         try:
-            await service.resolve(fake_code)
+            await resolve_service.resolve(fake_code)
             assert False, "Should have raised ShortCodeNotFoundException"
         except ShortCodeNotFoundException as e:
             print(f"  ✓ Correctly raised ShortCodeNotFoundException: {e}")
@@ -270,6 +279,7 @@ async def test_comprehensive_end_to_end_flow():
         ]
 
         # Shorten concurrently
+        set_request_id(generate_request_id())
         tasks = [service.shorten(HttpUrl(url)) for url in concurrent_urls]
         concurrent_results = await asyncio.gather(*tasks)
 

@@ -28,7 +28,7 @@ from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_url_repository, get_cache, get_url_queue
 from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
-from services.shorten.controllers import url_router
+from services.shorten.controllers import shorten_router
 
 QUEUE_DEPTH_POLL_INTERVAL = 10  # seconds
 
@@ -84,7 +84,6 @@ app.add_middleware(
 )
 
 # Health check endpoints (kept in main.py - see ARCHITECTURE.md for reasoning)
-# IMPORTANT: Must be defined BEFORE including url_router to ensure proper route precedence
 @app.get("/health")
 async def health_check() -> dict:
     """
@@ -205,29 +204,16 @@ async def shutdown_event() -> None:
     """Close singleton resources on shutdown to prevent leaks."""
     logger.info("Shorten Service shutting down - closing connections")
 
-    # Close singletons via dependency injection getters
-    from shared.config.dependencies import (
-        _url_repository_instance,
-        _cache_instance,
-        _url_queue_instance
-    )
-
-    if _url_repository_instance:
-        await _url_repository_instance.close()
-        logger.debug("URL repository closed")
-
-    if _cache_instance:
-        await _cache_instance.close()
-        logger.debug("Cache connection closed")
-
-    if _url_queue_instance:
-        await _url_queue_instance.close()
-        logger.debug("Queue connection closed")
+    from shared.config.dependencies import _instances
+    for key in ("url_repository", "cache", "url_queue"):
+        instance = _instances.get(key)
+        if instance and hasattr(instance, "close"):
+            await instance.close()
+            logger.debug(f"{key} closed")
 
     logger.info("Shorten Service shutdown complete")
 
-# Include API routers (AFTER defining /metrics to prevent route conflicts)
-app.include_router(url_router)
+app.include_router(shorten_router)
 
 logger.info(f"Shorten Service started (DC={settings.datacenter_id}, W={settings.worker_id})")
 

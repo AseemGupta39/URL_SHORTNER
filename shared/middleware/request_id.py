@@ -1,15 +1,14 @@
 """
-Request ID middleware for FastAPI.
+Request ID middleware — pure ASGI, no BaseHTTPMiddleware.
 
 Automatically generates and sets a unique request ID for every incoming HTTP request.
 """
-from fastapi import Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Scope, Receive, Send
 
 from shared.utils.request_context import generate_request_id, set_request_id, clear_request_id
 
 
-class RequestIDMiddleware(BaseHTTPMiddleware):
+class RequestIDMiddleware:
     """
     Middleware that generates a unique request ID for every HTTP request.
 
@@ -27,21 +26,25 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         app.add_middleware(RequestIDMiddleware)
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:
-        """Process request and inject request ID."""
-        # Generate and set request ID for this request
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         request_id = generate_request_id()
         set_request_id(request_id)
 
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append((b"x-request-id", request_id.encode()))
+                message = {**message, "headers": headers}
+            await send(message)
+
         try:
-            # Process request
-            response = await call_next(request)
-
-            # Add request ID to response headers for client tracking
-            response.headers["X-Request-ID"] = request_id
-
-            return response
-
+            await self.app(scope, receive, send_wrapper)
         finally:
-            # Clean up context
             clear_request_id()

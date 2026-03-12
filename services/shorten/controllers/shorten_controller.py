@@ -1,5 +1,5 @@
 """
-URL Shortening Controller
+Shorten Controller
 
 Handles HTTP routes for URL shortening operations.
 """
@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends
 import logging
 
 from shared.core.schemas import ShortenRequest, ShortenResponse
-from shared.core.services import URLService
-from shared.config.dependencies import get_url_service
+from shared.core.services import ShortenService
+from shared.config.dependencies import get_shorten_service
 from services.shorten.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,18 +28,16 @@ logger.info(f"Concurrency limiter: {settings.max_concurrent_requests or 'unlimit
 @router.post("/v1/shorten", response_model=ShortenResponse, tags=["Shorten"])
 async def shorten_url(
     request: ShortenRequest,
-    url_service: URLService = Depends(get_url_service)
+    shorten_service: ShortenService = Depends(get_shorten_service)
 ):
     """
     Create a short URL from a long URL.
 
-    This service uses Snowflake ID generation with unique DATACENTER_ID/WORKER_ID.
+    Uses Snowflake ID generation with pre-filled IDBuffer for lock-free ID generation.
     """
     logger.info(f"Shortening URL: {request.original_url}")
     if _concurrency_limiter:
         async with _concurrency_limiter:
-            result = await url_service.shorten(request.original_url)
-            return result
+            return await shorten_service.shorten(request.original_url)
     else:
-        result = await url_service.shorten(request.original_url)
-        return result
+        return await shorten_service.shorten(request.original_url)

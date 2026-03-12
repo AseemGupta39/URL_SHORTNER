@@ -12,12 +12,13 @@ import os
 os.environ['REDIS_ENABLED'] = 'true'
 os.environ['REDIS_URL'] = 'rediss://default:AW1fAAIncDI0NTIzMTIxNGYzMmE0ZjdjOGU1OGVmYWQ2OTVlYWU4OXAyMjc5OTk@safe-gecko-27999.upstash.io:6379'
 
-from shared.core.services import URLService
+from shared.core.services import ShortenService, ResolveService
 from shared.core.schemas import URLData
 from shared.data.repositories import SQLiteURLRepository
 from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.utils.redis_cache import RedisCache
 from shared.utils.redis_queue import RedisQueue
+from shared.utils.request_context import set_request_id, generate_request_id
 
 
 @pytest.mark.asyncio
@@ -42,14 +43,17 @@ async def test_end_to_end_batch_flow():
     repo = SQLiteURLRepository(db_url="sqlite+aiosqlite:///:memory:")
     await repo.initialize()
 
+    from shared.utils.id_buffer import IDBuffer
     id_gen = SnowflakeIDGenerator(datacenter_id=0, worker_id=0)
+    id_buffer = IDBuffer(generator=id_gen, size=100, refill_threshold=20)
+    await id_buffer.start()
 
-    service = URLService(
+    service = ShortenService(
         url_repo=repo,
-        id_generator=id_gen,
         cache=cache,
         queue=queue,
-        base_domain="test.ly"
+        id_buffer=id_buffer,
+        base_domain="test.ly",
     )
 
     try:
@@ -59,6 +63,7 @@ async def test_end_to_end_batch_flow():
         urls = [HttpUrl(f"https://test{i}.com") for i in range(num_urls)]
         short_codes = []
 
+        set_request_id(generate_request_id())
         for i, url in enumerate(urls):
             result = await service.shorten(url)
             short_codes.append(result.short_code)

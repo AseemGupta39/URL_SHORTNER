@@ -19,7 +19,7 @@ def mock_redis_client():
     """Create mock Redis client."""
     mock_client = AsyncMock()
     mock_client.ping = AsyncMock()
-    mock_client.lpush = AsyncMock(return_value=1)
+    mock_client.rpush = AsyncMock(return_value=1)
     mock_client.rpop = AsyncMock(return_value=None)
     mock_client.llen = AsyncMock(return_value=0)
     mock_client.delete = AsyncMock(return_value=1)
@@ -66,9 +66,9 @@ async def test_redis_queue_enqueue(redis_url, mock_redis_client):
     result = await queue.enqueue(test_data)
 
     assert result is True
-    mock_redis_client.lpush.assert_called_once()
+    mock_redis_client.rpush.assert_called_once()
 
-    call_args = mock_redis_client.lpush.call_args
+    call_args = mock_redis_client.rpush.call_args
     assert call_args[0][0] == "url_batch_queue"
 
     enqueued_data = json.loads(call_args[0][1])
