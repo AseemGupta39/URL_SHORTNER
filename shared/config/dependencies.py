@@ -20,6 +20,8 @@ from shared.core.services import ShortenService, ResolveService
 from shared.core.services.click_analytics_service import ClickAnalyticsService
 from shared.utils.interfaces.cache import Cache
 from shared.utils.redis_cache import RedisCache
+from shared.utils.lfu_cache import LFUCache
+from shared.utils.tiered_cache import TieredCache
 from shared.utils.interfaces.queue import Queue
 from shared.utils.redis_queue import RedisQueue
 
@@ -32,7 +34,7 @@ T = TypeVar("T")
 # ---------------------------------------------------------------------------
 
 _KEYS = (
-    "id_generator", "cache",
+    "id_generator", "cache", "tiered_cache",
     "url_queue", "click_queue", "url_dlq", "click_dlq",
     "url_repository", "click_repository",
     "shorten_service", "resolve_service", "click_analytics_service",
@@ -89,6 +91,15 @@ async def get_cache() -> Cache:
         await instance.connect()
         return instance
     return await _get_singleton("cache", factory)
+
+
+async def get_tiered_cache() -> Cache:
+    async def factory() -> Cache:
+        l2 = await get_cache()
+        l1 = LFUCache(max_size=settings.cache_max_size)
+        logger.info("Initializing TieredCache (L1: LFUCache, L2: RedisCache)")
+        return TieredCache(l1_cache=l1, l2_cache=l2)
+    return await _get_singleton("tiered_cache", factory)
 
 
 async def _make_queue(queue_name: str) -> Queue:
@@ -190,7 +201,7 @@ async def get_shorten_service(
 
 async def get_resolve_service(
     url_repo: URLRepository = Depends(get_url_repository),
-    cache: Cache = Depends(get_cache),
+    cache: Cache = Depends(get_tiered_cache),
 ) -> ResolveService:
     async def factory() -> ResolveService:
         logger.info("Initializing ResolveService (singleton)")
