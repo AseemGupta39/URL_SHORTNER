@@ -50,7 +50,7 @@ async def redirect_url(
     # Validate short code format BEFORE any processing (and before semaphore)
     # Prevents cache pollution, path traversal, and DoS attacks
     if not SHORT_CODE_PATTERN.match(short_code):
-        logger.warning(f"Invalid short code format rejected: {short_code}")
+        logger.warning("Invalid short code format", extra={"short_code": short_code})
         raise HTTPException(
             status_code=400,
             detail="Invalid short code format. Must be exactly 8 alphanumeric characters."
@@ -66,7 +66,7 @@ async def redirect_url(
 async def _resolve_and_redirect(short_code, request, url_service, click_service):
     """Resolve short code and redirect. Extracted to avoid code duplication in semaphore branches."""
     try:
-        logger.info(f"Resolving short code: {short_code}")
+        logger.info("Resolving short code", extra={"short_code": short_code})
         result = await url_service.resolve(short_code)
 
         # Track click asynchronously (fail-open - don't block redirect)
@@ -86,15 +86,12 @@ async def _resolve_and_redirect(short_code, request, url_service, click_service)
             )
         except Exception as e:
             # Log but don't fail redirect
-            logger.error(
-                f"Click tracking failed (non-critical): short_code={short_code} | error={str(e)}",
-                exc_info=True
-            )
+            logger.error("Click tracking failed", extra={"short_code": short_code, "error": str(e)}, exc_info=True)
 
         return FastAPIRedirect(
             url=str(result.original_url),
             status_code=302
         )
     except ShortCodeNotFoundException:
-        logger.warning(f"Short code not found: {short_code}")
+        logger.warning("Short code not found", extra={"short_code": short_code})
         raise HTTPException(status_code=404, detail="Short code not found")

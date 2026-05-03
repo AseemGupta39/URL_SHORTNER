@@ -47,7 +47,7 @@ class ResolveService:
         try:
             cached_data = await self.cache.get_async(short_code)
             if cached_data is not None:
-                logger.info(f"Cache HIT: short_code={short_code} | original_url={cached_data.original_url}")
+                logger.debug("Cache HIT", extra={"short_code": short_code, "original_url": cached_data.original_url})
                 track_cache_operation(CacheOperation.GET, CacheResult.HIT, self.service_name)
                 track_url_redirected(self.service_name)
                 return RedirectResponse(
@@ -55,7 +55,7 @@ class ResolveService:
                     status="found",
                 )
 
-            logger.debug(f"Cache MISS: short_code={short_code}")
+            logger.debug("Cache MISS", extra={"short_code": short_code})
             track_cache_operation(CacheOperation.GET, CacheResult.MISS, self.service_name)
 
             db_timer = Timer()
@@ -63,17 +63,17 @@ class ResolveService:
             db_duration = db_timer.total()
 
             if url_data is None:
-                logger.warning(f"Short code NOT FOUND: short_code={short_code} | db_query_time={db_duration:.2f}ms")
+                logger.warning("Short code not found", extra={"short_code": short_code, "db_time_ms": round(db_duration, 2)})
                 raise ShortCodeNotFoundException(short_code)
 
-            logger.info(f"DB lookup successful: short_code={short_code} | original_url={url_data.original_url} | db_query_time={db_duration:.2f}ms")
+            logger.info("DB lookup successful", extra={"short_code": short_code, "original_url": url_data.original_url, "db_time_ms": round(db_duration, 2)})
 
             cache_ok = await self.cache.set_async(short_code, url_data)
             if cache_ok:
-                logger.debug(f"Cache WARM successful: short_code={short_code}")
+                logger.debug("Cache WARM successful", extra={"short_code": short_code})
                 track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
             else:
-                logger.error(f"Cache WARM failed: short_code={short_code}")
+                logger.warning("Cache WARM failed", extra={"short_code": short_code})
                 track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
 
             track_url_redirected(self.service_name)
@@ -85,5 +85,5 @@ class ResolveService:
         except ShortCodeNotFoundException:
             raise
         except Exception as e:
-            logger.error(f"Failed to resolve short_code={short_code} | error={str(e)}", exc_info=True)
+            logger.error("Failed to resolve short code", extra={"short_code": short_code, "error": str(e)}, exc_info=True)
             raise
