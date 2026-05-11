@@ -43,10 +43,7 @@ class RedisCache(Cache):
         self._hits = 0
         self._misses = 0
 
-        logger.info(
-            f"RedisCache initialized (prefix={key_prefix}, ttl={ttl_seconds}s, "
-            f"pool_size={max_connections})"
-        )
+        logger.info("RedisCache initialized", extra={"key_prefix": key_prefix, "ttl_seconds": ttl_seconds, "pool_size": max_connections})
 
     async def connect(self) -> None:
         """
@@ -66,12 +63,9 @@ class RedisCache(Cache):
                     socket_connect_timeout=self.socket_connect_timeout
                 )
                 await self._client.ping()
-                logger.info(
-                    f"Redis cache connected | pool_size={self.max_connections} | "
-                    f"timeout={self.socket_timeout}s | connect_time={timer.total():.2f}ms"
-                )
+                logger.info("Redis cache connected", extra={"pool_size": self.max_connections, "timeout_seconds": self.socket_timeout, "connect_time_ms": round(timer.total(), 2)})
             except Exception as e:
-                logger.error(f"Redis cache connection failed: {e} | connect_time={timer.total():.2f}ms")
+                logger.error("Redis cache connection failed", extra={"error": str(e), "connect_time_ms": round(timer.total(), 2)})
                 raise
 
     async def close(self) -> None:
@@ -105,11 +99,11 @@ class RedisCache(Cache):
 
             if value is None:
                 self._misses += 1
-                logger.debug(f"Cache miss: {key} | redis_time={timer.total():.2f}ms")
+                logger.debug("Cache miss", extra={"short_code": key, "redis_time_ms": round(timer.total(), 2)})
                 return None
 
             self._hits += 1
-            logger.debug(f"Cache hit: {key} | redis_time={timer.total():.2f}ms")
+            logger.debug("Cache hit", extra={"short_code": key, "redis_time_ms": round(timer.total(), 2)})
 
             data_dict = json.loads(value)
 

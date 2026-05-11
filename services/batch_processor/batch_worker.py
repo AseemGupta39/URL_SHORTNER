@@ -4,6 +4,7 @@ Background Batch Worker
 Handles periodic batch processing of URLs from Redis queue to database.
 Runs as a background task or scheduled cron job.
 """
+
 import asyncio
 import uuid
 from datetime import datetime
@@ -21,7 +22,7 @@ from shared.middleware.metrics import (
     track_queue_operation,
     track_db_operation,
     update_queue_size,
-    track_batch_processed
+    track_batch_processed,
 )
 from shared.middleware.metrics_enums import QueueOperation, DBOperation
 
@@ -30,10 +31,7 @@ settings = get_settings()
 
 
 async def process_batch_from_queue(
-    url_repo: URLRepository,
-    queue: Queue,
-    dlq: Queue,
-    batch_size: int = None
+    url_repo: URLRepository, queue: Queue, dlq: Queue, batch_size: int = None
 ) -> dict:
     """
     Process a batch of URLs from queue and insert into database.
@@ -66,10 +64,13 @@ async def process_batch_from_queue(
                 "queue_size_before": 0,
                 "queue_size_after": 0,
                 "duration_ms": 0,
-                "failed_parse": 0
+                "failed_parse": 0,
             }
 
-        logger.info(f"Starting batch processing: batch_id={batch_id} | queue_size={queue_size}")
+        logger.info(
+            "Starting batch processing",
+            extra={"batch_id": batch_id, "queue_size": queue_size},
+        )
 
         timer = Timer()
 
@@ -83,7 +84,7 @@ async def process_batch_from_queue(
                 "queue_size_before": queue_size,
                 "queue_size_after": queue_size,
                 "duration_ms": 0,
-                "failed_parse": 0
+                "failed_parse": 0,
             }
 
         # Parse queue messages
@@ -96,49 +97,49 @@ async def process_batch_from_queue(
 
                 # Log individual item with original request_id for end-to-end traceability
                 logger.debug(
-                    f"Processing queued URL: short_code={msg.short_code} | "
-                    f"original_request_id={msg.request_id}"
+                    "Processing queued URL",
+                    extra={
+                        "short_code": msg.short_code,
+                        "original_url": msg.original_url,
+                    },
                 )
 
                 url_data = URLData(
                     short_code=msg.short_code,
                     original_url=msg.original_url,
-                    created_at=datetime.fromisoformat(msg.created_at)
+                    created_at=datetime.fromisoformat(msg.created_at),
                 )
                 url_data_list.append(url_data)
             except Exception as e:
                 failed_parse_count += 1
                 logger.error(
-                    f"Failed to parse queue message: error={str(e)} | "
-                    f"request_id={item.get('request_id', 'unknown')} | item={item}",
-                    exc_info=True
+                    "Failed to parse queue message",
+                    extra={
+                        "error": str(e),
+                        "request_id": item.get("request_id", "unknown"),
+                    },
+                    exc_info=True,
                 )
 
                 # Move failed message to dead-letter queue for later inspection
                 try:
                     dlq_msg = DeadLetterQueueMessage.from_failed_parse(
-                        original_message=item,
-                        exception=e,
-                        batch_id=batch_id
+                        original_message=item, exception=e, batch_id=batch_id
                     )
                     await dlq.enqueue(dlq_msg.to_dict())
                     logger.info(
-                        f"Moved failed message to DLQ: request_id={dlq_msg.request_id} | "
-                        f"error_type={dlq_msg.error_type}"
+                        "Moved failed message to DLQ",
+                        extra={"error_type": dlq_msg.error_type},
                     )
                 except Exception as dlq_error:
-                    logger.error(
-                        f"CRITICAL: Failed to enqueue to DLQ: error={dlq_error} | "
-                        f"original_message_lost={item}",
-                        exc_info=True
-                    )
+                    logger.critical("Message lost: failed to enqueue to DLQ", extra={"error": str(dlq_error), "lost_message": item}, exc_info=True)
 
                 continue
 
-        if not url_data_list:
+        if len(url_data_list) == 0:
             logger.warning(
-                f"All queue items failed to parse: batch_id={batch_id} | "
-                f"failed_count={failed_parse_count}"
+                "All queue items failed to parse",
+                extra={"batch_id": batch_id, "failed_count": failed_parse_count},
             )
             return {
                 "batch_id": batch_id,
@@ -146,7 +147,7 @@ async def process_batch_from_queue(
                 "queue_size_before": queue_size,
                 "queue_size_after": queue_size,
                 "duration_ms": 0,
-                "failed_parse": failed_parse_count
+                "failed_parse": failed_parse_count,
             }
 
         # Insert to database
@@ -158,19 +159,23 @@ async def process_batch_from_queue(
             db_duration_seconds = db_duration / 1000
 
             # Track DB operation with timing
-            track_db_operation(DBOperation.BATCH_WRITE, db_duration_seconds, "batch_processor")
+            track_db_operation(
+                DBOperation.BATCH_WRITE, db_duration_seconds, "batch_processor"
+            )
 
             # CRITICAL: Only remove from queue AFTER successful DB insert
             # This prevents data loss if DB fails
             items_to_remove = len(items)  # Total items peeked (including failed parses)
             remove_success = await queue.remove_first(items_to_remove)
             if remove_success:
-                logger.debug(f"Removed {items_to_remove} items from queue after successful DB insert")
+                logger.debug(
+                    "Removed items from queue after successful DB insert",
+                    extra={"queue_size": items_to_remove},
+                )
                 track_queue_operation(QueueOperation.DEQUEUE, "batch_processor")
             else:
                 logger.error(
-                    f"Failed to remove items from queue after DB insert | "
-                    f"Items will be reprocessed on next run (duplicate inserts will be ignored)"
+                    "Failed to remove items from queue after DB insert — will reprocess on next run"
                 )
 
             remaining_size = await queue.size()
@@ -182,10 +187,15 @@ async def process_batch_from_queue(
             track_batch_processed(inserted_count, "batch_processor")
 
             logger.info(
-                f"Batch INSERT successful: batch_id={batch_id} | "
-                f"inserted={inserted_count} | db_time={db_duration:.2f}ms | "
-                f"total_time={total_duration:.0f}ms | remaining_queue={remaining_size} | "
-                f"failed_parse={failed_parse_count}"
+                "Batch INSERT successful",
+                extra={
+                    "batch_id": batch_id,
+                    "inserted": inserted_count,
+                    "db_time_ms": round(db_duration, 2),
+                    "total_time_ms": round(total_duration, 2),
+                    "queue_size": remaining_size,
+                    "failed_parse": failed_parse_count,
+                },
             )
 
             return {
@@ -194,17 +204,21 @@ async def process_batch_from_queue(
                 "queue_size_before": queue_size,
                 "queue_size_after": remaining_size,
                 "duration_ms": int(total_duration),
-                "failed_parse": failed_parse_count
+                "failed_parse": failed_parse_count,
             }
 
         except Exception as e:
             db_duration = db_timer.total()
             pool_status = url_repo.get_pool_status()
             logger.error(
-                f"Batch INSERT failed: batch_id={batch_id} | "
-                f"count={len(url_data_list)} | db_time={db_duration:.2f}ms | "
-                f"pool_status={pool_status} | error={str(e)}",
-                exc_info=True
+                "Batch INSERT failed",
+                extra={
+                    "batch_id": batch_id,
+                    "count": len(url_data_list),
+                    "db_time_ms": round(db_duration, 2),
+                    "error": str(e),
+                },
+                exc_info=True,
             )
             raise
 
@@ -212,7 +226,9 @@ async def process_batch_from_queue(
         request_context.clear_batch_id()
 
 
-async def background_batch_processor(url_repo: URLRepository, queue: Queue, dlq: Queue) -> None:
+async def background_batch_processor(
+    url_repo: URLRepository, queue: Queue, dlq: Queue
+) -> None:
     """
     Background task that processes batch queue periodically.
 
@@ -224,7 +240,10 @@ async def background_batch_processor(url_repo: URLRepository, queue: Queue, dlq:
         queue: Queue instance (Redis or other implementation)
         dlq: Dead-letter queue for failed/unparseable messages
     """
-    logger.info(f"Background scheduler started (interval={settings.batch_interval_seconds}s)")
+    logger.info(
+        "Background scheduler started",
+        extra={"interval_seconds": settings.batch_interval_seconds},
+    )
 
     while True:
         try:
@@ -237,8 +256,5 @@ async def background_batch_processor(url_repo: URLRepository, queue: Queue, dlq:
             logger.info("Background scheduler cancelled gracefully")
             break
         except Exception as e:
-            logger.error(
-                f"Background batch processing error: error={str(e)}",
-                exc_info=True
-            )
+            logger.error("Background batch processing error", extra={"error": str(e)}, exc_info=True)
             # Continue running despite errors

@@ -1,6 +1,7 @@
 """
 SQLite/PostgreSQL repository implementation for URL storage using SQLAlchemy ORM.
 """
+
 from typing import Optional, List
 import logging
 
@@ -35,7 +36,7 @@ class SQLiteURLRepository(URLRepository):
         pool_timeout: int = 30,
         pool_recycle: int = 3600,
         pool_pre_ping: bool = True,
-        echo_pool: bool = False
+        echo_pool: bool = False,
     ):
         """
         Initialize repository with database URL and connection pooling.
@@ -88,11 +89,7 @@ class SQLiteURLRepository(URLRepository):
 
         if is_sqlite:
             # SQLite: No connection pooling (not supported)
-            self.engine = create_async_engine(
-                self.db_url,
-                echo=False,
-                future=True
-            )
+            self.engine = create_async_engine(self.db_url, echo=False, future=True)
             logger.debug("Database: SQLite (development, no pooling)")
         else:
             # PostgreSQL: Enable connection pooling for production
@@ -117,12 +114,12 @@ class SQLiteURLRepository(URLRepository):
             await conn.run_sync(Base.metadata.create_all)
 
         self.async_session = async_sessionmaker(
-            self.engine,
-            class_=AsyncSession,
-            expire_on_commit=False
+            self.engine, class_=AsyncSession, expire_on_commit=False
         )
 
-        logger.info(f"Database initialized successfully | connect_time={timer.total():.2f}ms")
+        logger.info(
+            f"Database initialized successfully | connect_time={timer.total():.2f}ms"
+        )
 
     async def close(self) -> None:
         """Close database connection."""
@@ -146,18 +143,22 @@ class SQLiteURLRepository(URLRepository):
         """
         await self.initialize()
 
-        logger.debug(f"Inserting URL mapping: {url_data.short_code} -> {url_data.original_url}")
+        logger.debug(
+            f"Inserting URL mapping: {url_data.short_code} -> {url_data.original_url}"
+        )
 
         async with self.async_session() as session:
             url_model = URLModel(
                 short_code=url_data.short_code,
                 original_url=url_data.original_url,
-                created_at=url_data.created_at
+                created_at=url_data.created_at,
             )
             session.add(url_model)
             await session.commit()
 
-        logger.info(f"URL mapping saved to database: {url_data.short_code} -> {url_data.original_url}")
+        logger.info(
+            f"URL mapping saved to database: {url_data.short_code} -> {url_data.original_url}"
+        )
 
         return url_data
 
@@ -183,7 +184,7 @@ class SQLiteURLRepository(URLRepository):
                 URLModel(
                     short_code=url_data.short_code,
                     original_url=url_data.original_url,
-                    created_at=url_data.created_at
+                    created_at=url_data.created_at,
                 )
                 for url_data in url_data_list
             ]
@@ -217,11 +218,13 @@ class SQLiteURLRepository(URLRepository):
                 logger.debug(f"Short code not found in database: {short_code}")
                 return None
 
-            logger.info(f"URL mapping found in database: {short_code} -> {url_model.original_url}")
+            logger.info(
+                f"URL mapping found in database: {short_code} -> {url_model.original_url}"
+            )
             url_data = URLData(
                 short_code=url_model.short_code,
                 original_url=url_model.original_url,
-                created_at=url_model.created_at
+                created_at=url_model.created_at,
             )
 
             return url_data
@@ -274,5 +277,5 @@ class SQLiteURLRepository(URLRepository):
             "overflow": pool.overflow(),  # Overflow connections created
             "max_overflow": self.max_overflow,
             "pool_size": self.pool_size,
-            "status": "active"
+            "status": "active",
         }

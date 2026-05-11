@@ -102,7 +102,7 @@ async def process_click_batch_from_queue(
                 failed_parse=0
             )
 
-        logger.info(f"Starting click batch processing: batch_id={batch_id} | queue_size={queue_size}")
+        logger.info("Starting click batch processing", extra={"batch_id": batch_id, "queue_size": queue_size})
 
         timer = Timer()
 
@@ -129,10 +129,7 @@ async def process_click_batch_from_queue(
                 msg = ClickQueueMessage(**item)
 
                 # Log individual item with original request_id for end-to-end traceability
-                logger.debug(
-                    f"Processing queued click: short_code={msg.short_code} | "
-                    f"original_request_id={msg.request_id}"
-                )
+                logger.debug("Processing queued click", extra={"short_code": msg.short_code, "original_url": msg.original_url})
 
                 # Convert to ClickData (domain model)
                 click_data = ClickData(
@@ -147,11 +144,7 @@ async def process_click_batch_from_queue(
 
             except Exception as e:
                 failed_parse_count += 1
-                logger.error(
-                    f"Failed to parse click queue message: error={str(e)} | "
-                    f"request_id={item.get('request_id', 'unknown')}",
-                    exc_info=True
-                )
+                logger.error("Failed to parse click queue message", extra={"error": str(e), "request_id": item.get("request_id", "unknown")}, exc_info=True)
 
                 # Move failed message to dead-letter queue for later inspection
                 try:
@@ -161,24 +154,14 @@ async def process_click_batch_from_queue(
                         batch_id=batch_id
                     )
                     await dlq.enqueue(dlq_msg.to_dict())
-                    logger.info(
-                        f"Moved failed message to DLQ: request_id={dlq_msg.request_id} | "
-                        f"error_type={dlq_msg.error_type}"
-                    )
+                    logger.info("Moved failed message to DLQ", extra={"error_type": dlq_msg.error_type})
                 except Exception as dlq_error:
-                    logger.error(
-                        f"CRITICAL: Failed to enqueue to DLQ: error={dlq_error} | "
-                        f"original_message_lost={item}",
-                        exc_info=True
-                    )
+                    logger.critical("Message lost: failed to enqueue to DLQ", extra={"error": str(dlq_error), "lost_message": item}, exc_info=True)
 
                 # Continue processing other items
 
-        if not click_data_list:
-            logger.warning(
-                f"All items failed to parse: batch_id={batch_id} | "
-                f"total_items={len(items)} | failed={failed_parse_count}"
-            )
+        if len(click_data_list) == 0:
+            logger.warning("All click items failed to parse", extra={"batch_id": batch_id, "total_items": len(items), "failed_parse": failed_parse_count})
             remaining_size = await queue.size()
             return ClickBatchResult(
                 batch_id=batch_id,
@@ -205,13 +188,10 @@ async def process_click_batch_from_queue(
             items_to_remove = len(items)  # Total items peeked (including failed parses)
             remove_success = await queue.remove_first(items_to_remove)
             if remove_success:
-                logger.debug(f"Removed {items_to_remove} click items from queue after successful DB insert")
+                logger.debug("Removed click items from queue after successful DB insert", extra={"queue_size": items_to_remove})
                 track_queue_operation(QueueOperation.DEQUEUE, "click_analytics")
             else:
-                logger.error(
-                    f"Failed to remove click items from queue after DB insert | "
-                    f"Items will be reprocessed on next run (duplicate inserts will be ignored)"
-                )
+                logger.error("Failed to remove click items from queue after DB insert — will reprocess on next run")
 
             remaining_size = await queue.size()
             update_queue_size(remaining_size, "click_analytics")
@@ -221,12 +201,7 @@ async def process_click_batch_from_queue(
             # Track business event
             track_batch_processed(inserted_count, "click_analytics")
 
-            logger.info(
-                f"Click batch INSERT successful: batch_id={batch_id} | "
-                f"inserted={inserted_count} | db_time={db_duration:.2f}ms | "
-                f"total_time={total_duration:.0f}ms | remaining_queue={remaining_size} | "
-                f"failed_parse={failed_parse_count}"
-            )
+            logger.info("Click batch INSERT successful", extra={"batch_id": batch_id, "inserted": inserted_count, "db_time_ms": round(db_duration, 2), "total_time_ms": round(total_duration, 2), "queue_size": remaining_size, "failed_parse": failed_parse_count})
 
             return ClickBatchResult(
                 batch_id=batch_id,
@@ -238,17 +213,11 @@ async def process_click_batch_from_queue(
             )
 
         except Exception as e:
-            logger.error(
-                f"Click batch INSERT failed: batch_id={batch_id} | error={str(e)}",
-                exc_info=True
-            )
+            logger.error("Click batch INSERT failed", extra={"batch_id": batch_id, "error": str(e)}, exc_info=True)
             raise
 
     except Exception as e:
-        logger.error(
-            f"Click batch processing failed: batch_id={batch_id} | error={str(e)}",
-            exc_info=True
-        )
+        logger.error("Click batch processing failed", extra={"batch_id": batch_id, "error": str(e)}, exc_info=True)
         raise
     finally:
         # Clear batch context for explicit lifecycle management
@@ -278,10 +247,7 @@ async def background_click_batch_processor(
     if interval_seconds is None:
         interval_seconds = settings.click_batch_interval_seconds
 
-    logger.info(
-        f"Click analytics background scheduler started: interval={interval_seconds}s | "
-        f"batch_size={settings.batch_size}"
-    )
+    logger.info("Click analytics background scheduler started", extra={"interval_seconds": interval_seconds, "batch_size": settings.batch_size})
 
     while True:
         try:
@@ -292,8 +258,5 @@ async def background_click_batch_processor(
             logger.info("Click analytics background scheduler cancelled gracefully")
             break
         except Exception as e:
-            logger.error(
-                f"Click analytics batch processing error: error={str(e)}",
-                exc_info=True
-            )
+            logger.error("Click analytics batch processing error", extra={"error": str(e)}, exc_info=True)
             # Continue running despite errors

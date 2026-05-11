@@ -22,7 +22,7 @@ _concurrency_limiter = (
     if settings.max_concurrent_requests > 0
     else None
 )
-logger.info(f"Concurrency limiter: {settings.max_concurrent_requests or 'unlimited'}")
+logger.info("Concurrency limiter", extra={"max_concurrent_requests": settings.max_concurrent_requests or "unlimited"})
 
 
 @router.post("/v1/shorten", response_model=ShortenResponse, tags=["Shorten"])
@@ -35,7 +35,7 @@ async def shorten_url(
 
     Uses Snowflake ID generation with pre-filled IDBuffer for lock-free ID generation.
     """
-    logger.info(f"Shortening URL: {request.original_url}")
+    logger.info("Shortening URL", extra={"original_url": str(request.original_url)})
     if _concurrency_limiter:
         async with _concurrency_limiter:
             return await shorten_service.shorten(request.original_url)

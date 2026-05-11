@@ -28,19 +28,19 @@ class TieredCache(Cache):
         # Check L1
         l1_val = await self.l1_cache.get_async(key)
         if l1_val is not None:
-            logger.debug(f"TieredCache L1 hit for {key}")
+            logger.debug("TieredCache L1 hit", extra={"short_code": key})
             return l1_val
 
-        logger.debug(f"TieredCache L1 miss for {key}")
+        logger.debug("TieredCache L1 miss", extra={"short_code": key})
 
         # Check L2
         l2_val = await self.l2_cache.get_async(key)
         if l2_val is not None:
-            logger.debug(f"TieredCache L2 hit for {key}, backfilling L1")
+            logger.debug("TieredCache L2 hit, backfilling L1", extra={"short_code": key})
             await self.l1_cache.set_async(key, l2_val)
             return l2_val
 
-        logger.debug(f"TieredCache L2 miss for {key}")
+        logger.debug("TieredCache L2 miss", extra={"short_code": key})
         return None
 
     async def set_async(self, key: str, value: Any) -> bool:
@@ -52,9 +52,9 @@ class TieredCache(Cache):
         l2_ok = await self.l2_cache.set_async(key, value)
         
         if not l1_ok:
-            logger.warning(f"TieredCache failed to write to L1 for {key}")
+            logger.warning("TieredCache failed to write to L1", extra={"short_code": key})
         if not l2_ok:
-            logger.warning(f"TieredCache failed to write to L2 for {key}")
+            logger.warning("TieredCache failed to write to L2", extra={"short_code": key})
             
         return l1_ok and l2_ok
 
