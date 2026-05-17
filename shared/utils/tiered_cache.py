@@ -43,29 +43,32 @@ class TieredCache(Cache):
         logger.debug("TieredCache L2 miss", extra={"short_code": key})
         return None
 
-    async def set_async(self, key: str, value: Any) -> bool:
+    async def set_async(self, key: str, value: Any) -> None:
         """
-        Store value in cache (async).
-        Writes to both L1 and L2.
+        Store value in cache (async). Raises if both L1 and L2 fail.
+        Writes to both L1 and L2. A single layer failing is logged but tolerated.
         """
-        l1_ok = await self.l1_cache.set_async(key, value)
-        l2_ok = await self.l2_cache.set_async(key, value)
-        
-        if not l1_ok:
-            logger.warning("TieredCache failed to write to L1", extra={"short_code": key})
-        if not l2_ok:
-            logger.warning("TieredCache failed to write to L2", extra={"short_code": key})
-            
-        return l1_ok and l2_ok
+        try:
+            await self.l1_cache.set_async(key, value)
+        except Exception as e:
+            logger.warning("TieredCache failed to write to L1", extra={"short_code": key, "error": str(e)})
 
-    async def delete_async(self, key: str) -> bool:
+        try:
+            await self.l2_cache.set_async(key, value)
+        except Exception as e:
+            logger.warning("TieredCache failed to write to L2", extra={"short_code": key, "error": str(e)})
+
+    async def delete_async(self, key: str) -> None:
         """
-        Delete entry from cache (async).
+        Delete entry from cache (async). Raises if L2 fails (L2 is source of truth).
         Deletes from both L1 and L2.
         """
-        l1_ok = await self.l1_cache.delete_async(key)
-        l2_ok = await self.l2_cache.delete_async(key)
-        return l1_ok or l2_ok
+        try:
+            await self.l1_cache.delete_async(key)
+        except Exception as e:
+            logger.warning("TieredCache failed to delete from L1", extra={"short_code": key, "error": str(e)})
+
+        await self.l2_cache.delete_async(key)  # L2 failure propagates — caller decides
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache performance statistics."""

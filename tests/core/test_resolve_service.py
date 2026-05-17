@@ -21,7 +21,7 @@ def mock_repository():
 def mock_cache():
     cache = AsyncMock()
     cache.get_async = AsyncMock(return_value=None)
-    cache.set_async = AsyncMock(return_value=True)
+    cache.set_async = AsyncMock(return_value=None)  # set_async now returns None, not bool
     return cache
 
 
@@ -137,26 +137,17 @@ async def test_not_found_does_not_warm_cache(service, mock_cache, mock_repositor
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_cache_warm_failure_does_not_break_resolve(service, mock_cache, mock_repository, url_data):
-    """Cache warm failing should not prevent the redirect from succeeding."""
-    mock_cache.get_async = AsyncMock(return_value=None)
-    mock_repository.get_by_short_code = AsyncMock(return_value=url_data)
-    mock_cache.set_async = AsyncMock(return_value=False)
-
-    result = await service.resolve("abc12345")
-
-    assert isinstance(result, RedirectResponse)
-    assert result.status == "found"
-
-
-@pytest.mark.asyncio
 async def test_cache_warm_exception_does_not_break_resolve(service, mock_cache, mock_repository, url_data):
+    """Cache warm raising must not prevent the redirect from succeeding (fail-open)."""
     mock_cache.get_async = AsyncMock(return_value=None)
     mock_repository.get_by_short_code = AsyncMock(return_value=url_data)
     mock_cache.set_async = AsyncMock(side_effect=Exception("Redis down"))
 
-    with pytest.raises(Exception):
-        await service.resolve("abc12345")
+    # redirect must still succeed even if cache warm throws
+    result = await service.resolve("abc12345")
+
+    assert isinstance(result, RedirectResponse)
+    assert result.status == "found"
 
 
 # ---------------------------------------------------------------------------
@@ -183,12 +174,28 @@ async def test_resolve_passes_correct_short_code_to_db(service, mock_cache, mock
 
 
 # ---------------------------------------------------------------------------
-# Cache get_async raises an exception (not just returns None)
+# Cache get_async raises an exception — treat as miss, fall through to DB
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_cache_get_exception_propagates(service, mock_cache):
+async def test_cache_get_exception_falls_through_to_db(service, mock_cache, mock_repository, url_data):
+    """Redis GET error must be treated as a cache miss — redirect must still succeed via DB."""
     mock_cache.get_async = AsyncMock(side_effect=Exception("Redis connection lost"))
+    mock_repository.get_by_short_code = AsyncMock(return_value=url_data)
 
-    with pytest.raises(Exception, match="Redis connection lost"):
+    # must NOT raise — degrades to DB path
+    result = await service.resolve("abc12345")
+
+    assert isinstance(result, RedirectResponse)
+    assert result.status == "found"
+    mock_repository.get_by_short_code.assert_called_once_with("abc12345")
+
+
+@pytest.mark.asyncio
+async def test_cache_get_exception_db_miss_raises_not_found(service, mock_cache, mock_repository):
+    """Redis GET error + DB miss = 404, not 500."""
+    mock_cache.get_async = AsyncMock(side_effect=Exception("Redis connection lost"))
+    mock_repository.get_by_short_code = AsyncMock(return_value=None)
+
+    with pytest.raises(ShortCodeNotFoundException):
         await service.resolve("abc12345")

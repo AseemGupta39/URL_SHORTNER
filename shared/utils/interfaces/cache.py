@@ -20,13 +20,13 @@ class Cache(ABC):
         pass
 
     @abstractmethod
-    async def set_async(self, key: str, value: Any) -> bool:
-        """Store value in cache (async)."""
+    async def set_async(self, key: str, value: Any) -> None:
+        """Store value in cache (async). Raises on failure."""
         pass
 
     @abstractmethod
-    async def delete_async(self, key: str) -> bool:
-        """Delete entry from cache (async)."""
+    async def delete_async(self, key: str) -> None:
+        """Delete entry from cache (async). Raises on failure."""
         pass
 
     @abstractmethod

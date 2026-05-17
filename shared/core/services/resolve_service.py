@@ -45,7 +45,14 @@ class ResolveService:
         Raises ShortCodeNotFoundException if not found.
         """
         try:
-            cached_data = await self.cache.get_async(short_code)
+            # cache GET — Redis error is not a miss; track separately and fall through to DB
+            try:
+                cached_data = await self.cache.get_async(short_code)
+            except Exception as cache_err:
+                logger.warning("Cache GET error, falling through to DB", extra={"short_code": short_code, "error": str(cache_err)})
+                track_cache_operation(CacheOperation.GET, CacheResult.FAILURE, self.service_name)
+                cached_data = None
+
             if cached_data is not None:
                 logger.debug("Cache HIT", extra={"short_code": short_code, "original_url": cached_data.original_url})
                 track_cache_operation(CacheOperation.GET, CacheResult.HIT, self.service_name)
@@ -68,12 +75,13 @@ class ResolveService:
 
             logger.info("DB lookup successful", extra={"short_code": short_code, "original_url": url_data.original_url, "db_time_ms": round(db_duration, 2)})
 
-            cache_ok = await self.cache.set_async(short_code, url_data)
-            if cache_ok:
+            # cache warm — fail-open, never blocks the redirect
+            try:
+                await self.cache.set_async(short_code, url_data)
                 logger.debug("Cache WARM successful", extra={"short_code": short_code})
                 track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
-            else:
-                logger.warning("Cache WARM failed", extra={"short_code": short_code})
+            except Exception as cache_err:
+                logger.warning("Cache WARM failed", extra={"short_code": short_code, "error": str(cache_err)})
                 track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
 
             track_url_redirected(self.service_name)

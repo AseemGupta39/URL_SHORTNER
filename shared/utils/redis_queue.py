@@ -74,148 +74,130 @@ class RedisQueue(Queue):
             self._client = None
             logger.info("RedisQueue disconnected")
 
-    async def enqueue(self, data: Dict[str, Any]) -> bool:
+    async def enqueue(self, data: Dict[str, Any]) -> None:
         """
-        Add item to queue (FIFO order).
+        Add item to queue (FIFO order). Raises on failure.
 
         Uses RPUSH to add to right side, maintaining FIFO order with LRANGE from left.
 
         Args:
             data: Dictionary to enqueue
-
-        Returns:
-            True if successful, False otherwise
         """
         if not self._client:
-            logger.warning("RedisQueue not connected")
-            return False
+            raise RuntimeError("RedisQueue not connected")
 
         timer = Timer()
         try:
             data_json = json.dumps(data)
-            await self._client.rpush(self.queue_name, data_json)  # Push to RIGHT for FIFO
-            logger.debug(f"Enqueued to {self.queue_name} | redis_time={timer.total():.2f}ms")
-            return True
+            await self._client.rpush(self.queue_name, data_json)
+            logger.debug("Enqueued to queue", extra={"queue_name": self.queue_name, "redis_time_ms": round(timer.total(), 2)})
 
         except Exception as e:
-            logger.error(f"RedisQueue enqueue error: {e} | redis_time={timer.total():.2f}ms")
-            return False
+            logger.error("RedisQueue enqueue error", extra={"queue_name": self.queue_name, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
+            raise
 
     async def dequeue(self, count: int = 1) -> List[Dict[str, Any]]:
         """
-        Remove and return items from queue.
+        Remove and return items from queue. Raises on Redis error. Returns [] on empty queue.
 
         Args:
             count: Number of items to dequeue
 
         Returns:
-            List of dictionaries
+            List of dictionaries, empty list if queue is empty
         """
         if not self._client:
-            logger.warning("RedisQueue not connected")
-            return []
+            raise RuntimeError("RedisQueue not connected")
 
         timer = Timer()
         try:
             if count == 1:
                 result = await self._client.rpop(self.queue_name)
                 if result:
-                    logger.debug(f"Dequeued 1 item from {self.queue_name} | redis_time={timer.total():.2f}ms")
+                    logger.debug("Dequeued 1 item", extra={"queue_name": self.queue_name, "redis_time_ms": round(timer.total(), 2)})
                     return [json.loads(result)]
                 return []
             else:
                 results = await self._client.rpop(self.queue_name, count)
                 if results:
-                    logger.debug(f"Dequeued {len(results)} items from {self.queue_name} | redis_time={timer.total():.2f}ms")
+                    logger.debug("Dequeued items", extra={"queue_name": self.queue_name, "count": len(results), "redis_time_ms": round(timer.total(), 2)})
                     return [json.loads(item) for item in results]
                 return []
 
         except Exception as e:
-            logger.error(f"RedisQueue dequeue error: {e} | redis_time={timer.total():.2f}ms")
-            return []
+            logger.error("RedisQueue dequeue error", extra={"queue_name": self.queue_name, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
+            raise
 
     async def size(self) -> int:
-        """Get number of items in queue."""
+        """Get number of items in queue. Raises on Redis error."""
         if not self._client:
-            logger.warning("RedisQueue not connected")
-            return 0
+            raise RuntimeError("RedisQueue not connected")
 
         try:
             return await self._client.llen(self.queue_name)
 
         except Exception as e:
-            logger.error(f"RedisQueue size error: {e}")
-            return 0
+            logger.error("RedisQueue size error", extra={"queue_name": self.queue_name, "error": str(e)})
+            raise
 
-    async def clear(self) -> bool:
-        """Clear all items from queue."""
+    async def clear(self) -> None:
+        """Clear all items from queue. Raises on failure."""
         if not self._client:
-            logger.warning("RedisQueue not connected")
-            return False
+            raise RuntimeError("RedisQueue not connected")
 
         try:
             await self._client.delete(self.queue_name)
-            logger.info(f"Cleared queue: {self.queue_name}")
-            return True
+            logger.info("Cleared queue", extra={"queue_name": self.queue_name})
 
         except Exception as e:
-            logger.error(f"RedisQueue clear error: {e}")
-            return False
+            logger.error("RedisQueue clear error", extra={"queue_name": self.queue_name, "error": str(e)})
+            raise
 
     async def peek(self, count: int = 1) -> List[Dict[str, Any]]:
         """
-        Peek at items without removing them from queue (FIFO order).
+        Peek at items without removing them from queue (FIFO order). Raises on Redis error. Returns [] on empty queue.
 
         Uses LRANGE to read from left side, maintaining FIFO order with RPUSH to right.
-        Safe for data loss prevention - items remain in queue.
 
         Args:
             count: Number of items to peek at
 
         Returns:
-            List of dictionaries in FIFO order (oldest first)
+            List of dictionaries in FIFO order (oldest first), empty list if queue is empty
         """
         if not self._client:
-            logger.warning("RedisQueue not connected")
-            return []
+            raise RuntimeError("RedisQueue not connected")
 
         timer = Timer()
         try:
-            # LRANGE 0 (count-1) gets first 'count' items without removing
             results = await self._client.lrange(self.queue_name, 0, count - 1)
             if results:
-                logger.debug(f"Peeked {len(results)} items from {self.queue_name} | redis_time={timer.total():.2f}ms")
+                logger.debug("Peeked items", extra={"queue_name": self.queue_name, "count": len(results), "redis_time_ms": round(timer.total(), 2)})
                 return [json.loads(item) for item in results]
             return []
 
         except Exception as e:
-            logger.error(f"RedisQueue peek error: {e} | redis_time={timer.total():.2f}ms")
-            return []
+            logger.error("RedisQueue peek error", extra={"queue_name": self.queue_name, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
+            raise
 
-    async def remove_first(self, count: int) -> bool:
+    async def remove_first(self, count: int) -> None:
         """
-        Remove first N items from queue (FIFO order).
+        Remove first N items from queue (FIFO order). Raises on failure.
 
         Uses LTRIM to remove items from left side AFTER successful processing.
         Works with RPUSH enqueue and LRANGE peek to maintain FIFO order.
 
         Args:
             count: Number of items to remove from front (oldest items)
-
-        Returns:
-            True if successful, False otherwise
         """
         if not self._client:
-            logger.warning("RedisQueue not connected")
-            return False
+            raise RuntimeError("RedisQueue not connected")
 
         timer = Timer()
         try:
-            # LTRIM count -1 removes first 'count' items (keeps from index 'count' onwards)
             await self._client.ltrim(self.queue_name, count, -1)
-            logger.debug(f"Removed first {count} items from {self.queue_name} | redis_time={timer.total():.2f}ms")
-            return True
+            logger.debug("Removed first N items from queue", extra={"queue_name": self.queue_name, "count": count, "redis_time_ms": round(timer.total(), 2)})
 
         except Exception as e:
-            logger.error(f"RedisQueue remove_first error: {e} | redis_time={timer.total():.2f}ms")
-            return False
+            logger.error("RedisQueue remove_first error", extra={"queue_name": self.queue_name, "count": count, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
+            raise

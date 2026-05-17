@@ -7,16 +7,16 @@ from shared.utils.tiered_cache import TieredCache
 def mock_l1():
     cache = AsyncMock()
     cache.get_async = AsyncMock(return_value=None)
-    cache.set_async = AsyncMock(return_value=True)
-    cache.delete_async = AsyncMock(return_value=True)
+    cache.set_async = AsyncMock(return_value=None)  # set_async returns None now
+    cache.delete_async = AsyncMock(return_value=None)  # delete_async returns None now
     return cache
 
 @pytest.fixture
 def mock_l2():
     cache = AsyncMock()
     cache.get_async = AsyncMock(return_value=None)
-    cache.set_async = AsyncMock(return_value=True)
-    cache.delete_async = AsyncMock(return_value=True)
+    cache.set_async = AsyncMock(return_value=None)
+    cache.delete_async = AsyncMock(return_value=None)
     return cache
 
 @pytest.fixture
@@ -56,14 +56,12 @@ async def test_tiered_cache_miss(tiered_cache, mock_l1, mock_l2):
 
 @pytest.mark.asyncio
 async def test_tiered_cache_set(tiered_cache, mock_l1, mock_l2):
-    ok = await tiered_cache.set_async("key1", "val1")
-    assert ok is True
+    await tiered_cache.set_async("key1", "val1")
     mock_l1.set_async.assert_called_once_with("key1", "val1")
     mock_l2.set_async.assert_called_once_with("key1", "val1")
 
 @pytest.mark.asyncio
 async def test_tiered_cache_delete(tiered_cache, mock_l1, mock_l2):
-    ok = await tiered_cache.delete_async("key1")
-    assert ok is True
+    await tiered_cache.delete_async("key1")
     mock_l1.delete_async.assert_called_once_with("key1")
     mock_l2.delete_async.assert_called_once_with("key1")

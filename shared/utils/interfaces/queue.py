@@ -21,15 +21,12 @@ class Queue(ABC):
         pass
 
     @abstractmethod
-    async def enqueue(self, data: Dict[str, Any]) -> bool:
+    async def enqueue(self, data: Dict[str, Any]) -> None:
         """
-        Add item to queue.
+        Add item to queue. Raises on failure.
 
         Args:
             data: Dictionary to enqueue
-
-        Returns:
-            True if successful, False otherwise
         """
         pass
 
@@ -52,8 +49,8 @@ class Queue(ABC):
         pass
 
     @abstractmethod
-    async def clear(self) -> bool:
-        """Clear all items from queue."""
+    async def clear(self) -> None:
+        """Clear all items from queue. Raises on failure."""
         pass
 
     @abstractmethod
@@ -70,14 +67,11 @@ class Queue(ABC):
         pass
 
     @abstractmethod
-    async def remove_first(self, count: int) -> bool:
+    async def remove_first(self, count: int) -> None:
         """
-        Remove first N items from queue.
+        Remove first N items from queue. Raises on failure.
 
         Args:
             count: Number of items to remove from front
-
-        Returns:
-            True if successful, False otherwise
         """
         pass

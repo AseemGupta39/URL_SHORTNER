@@ -25,7 +25,7 @@ def mock_click_repo():
 @pytest.fixture
 def mock_queue():
     queue = AsyncMock()
-    queue.enqueue = AsyncMock(return_value=True)
+    queue.enqueue = AsyncMock(return_value=None)  # enqueue returns None now
     return queue
 
 

@@ -109,10 +109,10 @@ class TestLFUCache:
     async def test_delete_functionality(self) -> None:
         cache = LFUCache(max_size=10)
         await cache.set_async("k1", "v1")
-        assert await cache.delete_async("k1") is True
+        await cache.delete_async("k1")
         assert await cache.get_async("k1") is None
-        assert await cache.delete_async("k1") is False
-        assert await cache.delete_async("nonexistent") is False
+        await cache.delete_async("k1")  # already deleted — no-op, no error
+        await cache.delete_async("nonexistent")  # no-op, no error
 
     @pytest.mark.asyncio
     async def test_delete_updates_min_freq(self) -> None:

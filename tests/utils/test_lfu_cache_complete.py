@@ -24,8 +24,8 @@ class TestLFUCacheComplete:
         data1 = make_url("code1")
         data2 = make_url("code2")
         
-        assert await cache.set_async("k1", data1) is True
-        assert await cache.set_async("k2", data2) is True
+        await cache.set_async("k1", data1)
+        await cache.set_async("k2", data2)
         
         assert await cache.get_async("k1") == data1
         assert await cache.get_async("k2") == data2
@@ -95,10 +95,10 @@ class TestLFUCacheComplete:
         await cache.set_async("k1", "v1")
         await cache.set_async("k2", "v2")
         
-        assert await cache.delete_async("k1") is True
+        await cache.delete_async("k1")
         assert await cache.get_async("k1") is None
-        assert await cache.delete_async("k1") is False # Already deleted
-        assert await cache.delete_async("nonexistent") is False
+        await cache.delete_async("k1")  # already deleted — no-op, no error
+        await cache.delete_async("nonexistent")  # no-op, no error
         
         assert cache.get_stats()["size"] == 1
 

@@ -186,12 +186,9 @@ async def process_click_batch_from_queue(
             # CRITICAL: Only remove from queue AFTER successful DB insert
             # This prevents data loss if DB fails
             items_to_remove = len(items)  # Total items peeked (including failed parses)
-            remove_success = await queue.remove_first(items_to_remove)
-            if remove_success:
-                logger.debug("Removed click items from queue after successful DB insert", extra={"queue_size": items_to_remove})
-                track_queue_operation(QueueOperation.DEQUEUE, "click_analytics")
-            else:
-                logger.error("Failed to remove click items from queue after DB insert — will reprocess on next run")
+            await queue.remove_first(items_to_remove)  # raises on failure — caught by outer except, items reprocessed on next run
+            logger.debug("Removed click items from queue after successful DB insert", extra={"queue_size": items_to_remove})
+            track_queue_operation(QueueOperation.DEQUEUE, "click_analytics")
 
             remaining_size = await queue.size()
             update_queue_size(remaining_size, "click_analytics")

@@ -63,9 +63,8 @@ async def test_redis_queue_enqueue(redis_url, mock_redis_client):
         "created_at": "2024-01-01T00:00:00"
     }
 
-    result = await queue.enqueue(test_data)
+    await queue.enqueue(test_data)
 
-    assert result is True
     mock_redis_client.rpush.assert_called_once()
 
     call_args = mock_redis_client.rpush.call_args
@@ -143,30 +142,27 @@ async def test_redis_queue_clear(redis_url, mock_redis_client):
     queue = RedisQueue(redis_url)
     queue._client = mock_redis_client
 
-    result = await queue.clear()
+    await queue.clear()
 
-    assert result is True
     mock_redis_client.delete.assert_called_once_with("url_batch_queue")
 
 
 @pytest.mark.asyncio
 async def test_redis_queue_enqueue_without_connection(redis_url):
-    """Test enqueuing without connection returns False."""
+    """Test enqueuing without connection raises RuntimeError."""
     queue = RedisQueue(redis_url)
 
-    result = await queue.enqueue({"test": "data"})
-
-    assert result is False
+    with pytest.raises(RuntimeError, match="not connected"):
+        await queue.enqueue({"test": "data"})
 
 
 @pytest.mark.asyncio
 async def test_redis_queue_dequeue_without_connection(redis_url):
-    """Test dequeuing without connection returns empty list."""
+    """Test dequeuing without connection raises RuntimeError."""
     queue = RedisQueue(redis_url)
 
-    result = await queue.dequeue()
-
-    assert result == []
+    with pytest.raises(RuntimeError, match="not connected"):
+        await queue.dequeue()
 
 
 @pytest.mark.asyncio

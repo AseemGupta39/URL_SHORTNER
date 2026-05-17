@@ -108,55 +108,43 @@ class LFUCache(Cache):
 
         return self._entries[key].value
 
-    async def set_async(self, key: str, value: Any) -> bool:
-        """Store value in cache (async)."""
+    async def set_async(self, key: str, value: Any) -> None:
+        """Store value in cache (async). Raises on failure."""
         if key in self._entries:
-            # Update existing item
             self._entries[key].value = value
             self._update_frequency(key)
-            return True
+            return
 
-        # Handle new item insertion
         if len(self._entries) >= self._max_size:
             self._evict()
 
-        # Add new entry at frequency 1
         self._entries[key] = LFUEntry(value)
 
-        # Ensure the frequency 1 bucket exists and add the key
         if 1 not in self._freq_buckets:
             self._freq_buckets[1] = {}
         self._freq_buckets[1][key] = None
 
-        # Reset min_freq to 1 since we just added a new item
         self._min_freq = 1
-        return True
 
-    async def delete_async(self, key: str) -> bool:
-        """Delete entry from cache (async)."""
+    async def delete_async(self, key: str) -> None:
+        """Delete entry from cache (async). Raises on failure."""
         if key not in self._entries:
-            return False
+            return
 
         entry = self._entries[key]
         freq = entry.frequency
 
-        # Remove from tracking dictionaries
         del self._entries[key]
         del self._freq_buckets[freq][key]
 
-        # Cleanup bucket if empty
         if len(self._freq_buckets[freq]) == 0:
             del self._freq_buckets[freq]
 
-            # If this was the min_freq, we need to find the next lowest frequency
             if self._min_freq == freq:
                 if not self._entries:
                     self._min_freq = 1
                 else:
-                    # Find the new lowest frequency bucket
                     self._min_freq = min(self._freq_buckets.keys())
-
-        return True
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache performance statistics."""

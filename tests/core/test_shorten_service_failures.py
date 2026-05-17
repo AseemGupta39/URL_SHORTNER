@@ -25,15 +25,15 @@ def mock_repository():
 @pytest.fixture
 def mock_cache():
     cache = AsyncMock()
-    cache.set_async = AsyncMock(return_value=True)
-    cache.delete_async = AsyncMock(return_value=True)
+    cache.set_async = AsyncMock(return_value=None)   # set_async returns None now
+    cache.delete_async = AsyncMock(return_value=None)  # delete_async returns None now
     return cache
 
 
 @pytest.fixture
 def mock_queue():
     queue = AsyncMock()
-    queue.enqueue = AsyncMock(return_value=True)
+    queue.enqueue = AsyncMock(return_value=None)  # enqueue returns None now
     return queue
 
 
@@ -79,7 +79,7 @@ async def test_shorten_happy_path(_, service, mock_cache, mock_queue, mock_repos
 @pytest.mark.asyncio
 @patch("shared.utils.request_context.get_request_id", return_value="req-test")
 async def test_queue_failure_triggers_db_fallback(_, service, mock_queue, mock_repository):
-    mock_queue.enqueue = AsyncMock(return_value=False)
+    mock_queue.enqueue = AsyncMock(side_effect=Exception("Redis down"))
 
     result = await service.shorten(HttpUrl("https://example.com"))
 
@@ -105,9 +105,9 @@ async def test_queue_exception_triggers_db_fallback(_, service, mock_queue, mock
 @pytest.mark.asyncio
 @patch("shared.utils.request_context.get_request_id", return_value="req-test")
 async def test_queue_and_db_fail_rolls_back_cache(_, service, mock_queue, mock_repository, mock_cache):
-    mock_queue.enqueue = AsyncMock(return_value=False)
+    mock_queue.enqueue = AsyncMock(side_effect=Exception("Redis down"))
     mock_repository.batch_create = AsyncMock(side_effect=Exception("DB error"))
-    mock_cache.set_async = AsyncMock(return_value=True)
+    mock_cache.set_async = AsyncMock(return_value=None)  # cache succeeded
 
     with pytest.raises(Exception, match="DB error"):
         await service.shorten(HttpUrl("https://example.com"))
@@ -119,9 +119,9 @@ async def test_queue_and_db_fail_rolls_back_cache(_, service, mock_queue, mock_r
 @patch("shared.utils.request_context.get_request_id", return_value="req-test")
 async def test_queue_and_db_fail_no_rollback_when_cache_failed(_, service, mock_queue, mock_repository, mock_cache):
     """If cache also failed, no rollback needed (nothing to roll back)."""
-    mock_queue.enqueue = AsyncMock(return_value=False)
+    mock_queue.enqueue = AsyncMock(side_effect=Exception("Redis down"))
     mock_repository.batch_create = AsyncMock(side_effect=Exception("DB error"))
-    mock_cache.set_async = AsyncMock(return_value=False)
+    mock_cache.set_async = AsyncMock(side_effect=Exception("Redis down"))  # cache also failed
 
     with pytest.raises(Exception, match="DB error"):
         await service.shorten(HttpUrl("https://example.com"))
@@ -192,10 +192,10 @@ async def test_response_created_at_is_datetime(_, service):
 @patch("shared.utils.request_context.get_request_id", return_value="req-test")
 async def test_cache_rollback_failure_still_raises_original_db_error(_, service, mock_queue, mock_repository, mock_cache):
     """Even if cache delete fails, the original DB error is still raised."""
-    mock_queue.enqueue = AsyncMock(return_value=False)
+    mock_queue.enqueue = AsyncMock(side_effect=Exception("Redis down"))
     mock_repository.batch_create = AsyncMock(side_effect=Exception("DB error"))
-    mock_cache.set_async = AsyncMock(return_value=True)
-    mock_cache.delete_async = AsyncMock(return_value=False)  # rollback also fails
+    mock_cache.set_async = AsyncMock(return_value=None)  # cache succeeded
+    mock_cache.delete_async = AsyncMock(side_effect=Exception("Redis down"))  # rollback also fails
 
     with pytest.raises(Exception, match="DB error"):
         await service.shorten(HttpUrl("https://example.com"))

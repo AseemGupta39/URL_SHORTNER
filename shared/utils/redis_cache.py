@@ -86,11 +86,10 @@ class RedisCache(Cache):
             key: The short code (e.g., "abc123")
 
         Returns:
-            Cached value if found, None otherwise
+            Cached value if found, None on cache miss. Raises on Redis error.
         """
         if not self._client:
-            logger.warning("Redis not connected")
-            return None
+            raise RuntimeError("RedisCache not connected")
 
         timer = Timer()
         try:
@@ -118,30 +117,24 @@ class RedisCache(Cache):
             return data_dict
 
         except Exception as e:
-            logger.error(f"Redis GET error [{key}]: {e} | redis_time={timer.total():.2f}ms")
-            self._misses += 1
-            return None
+            logger.error("Redis GET error", extra={"short_code": key, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
+            raise
 
-    async def set_async(self, key: str, value: Any) -> bool:
+    async def set_async(self, key: str, value: Any) -> None:
         """
-        Store value in cache.
+        Store value in cache. Raises on failure.
 
         Args:
             key: The short code (e.g., "abc123")
             value: The data to cache (e.g., original URL)
-
-        Returns:
-            True if successful, False otherwise
         """
         if not self._client:
-            logger.warning("Redis not connected")
-            return False
+            raise RuntimeError("RedisCache not connected")
 
         timer = Timer()
         try:
             full_key = self._make_key(key)
 
-            # Handle Pydantic models
             if hasattr(value, 'model_dump'):
                 value_dict = value.model_dump()
             elif hasattr(value, 'dict'):
@@ -152,40 +145,31 @@ class RedisCache(Cache):
             value_json = json.dumps(value_dict, default=str)
 
             await self._client.set(full_key, value_json, ex=self.ttl_seconds)
-            logger.debug(f"Cached: {key} (ttl={self.ttl_seconds}s) | redis_time={timer.total():.2f}ms")
-            return True
+            logger.debug("Cache SET", extra={"short_code": key, "ttl_seconds": self.ttl_seconds, "redis_time_ms": round(timer.total(), 2)})
 
         except Exception as e:
-            logger.error(f"Redis SET error [{key}]: {e} | redis_time={timer.total():.2f}ms")
-            return False
+            logger.error("Redis SET error", extra={"short_code": key, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
+            raise
 
-    async def delete_async(self, key: str) -> bool:
+    async def delete_async(self, key: str) -> None:
         """
-        Remove entry from cache.
+        Remove entry from cache. Raises on failure.
 
         Args:
             key: The short code to remove
-
-        Returns:
-            True if key was found and deleted, False if not found
         """
         if not self._client:
-            logger.warning("Redis not connected")
-            return False
+            raise RuntimeError("RedisCache not connected")
 
         try:
             full_key = self._make_key(key)
             result = await self._client.delete(full_key)
-            deleted = result > 0
-
-            if deleted:
-                logger.debug(f"Deleted: {key}")
-
-            return deleted
+            if result > 0:
+                logger.debug("Cache DELETE", extra={"short_code": key})
 
         except Exception as e:
-            logger.error(f"Redis DELETE error [{key}]: {e}")
-            return False
+            logger.error("Redis DELETE error", extra={"short_code": key, "error": str(e)})
+            raise
 
     def get_stats(self) -> Dict[str, Any]:
         """
