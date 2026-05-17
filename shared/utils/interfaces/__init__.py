@@ -7,12 +7,11 @@ This module provides abstract base classes for:
 - Queuing (Redis, etc.)
 """
 from .id_generator import IDGenerator
-from .cache import Cache, CacheEntry
+from .cache import Cache
 from .queue import Queue
 
 __all__ = [
     'IDGenerator',
     'Cache',
-    'CacheEntry',
     'Queue'
 ]

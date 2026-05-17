@@ -1,11 +1,10 @@
 """
 Cache Interface
 
-Abstract base class for cache implementations with CacheEntry helper.
+Abstract base class for cache implementations.
 """
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
-from datetime import datetime
 
 
 class Cache(ABC):
@@ -33,21 +32,3 @@ class Cache(ABC):
     def get_stats(self) -> Dict[str, Any]:
         """Get cache performance statistics."""
         pass
-
-
-class CacheEntry:
-    """
-    A simple container for cached data with expiration time.
-
-    Think of it like a sticky note with:
-    - The actual data (value)
-    - An expiration date (expires_at)
-    """
-
-    def __init__(self, value: Any, expires_at: datetime):
-        self.value = value
-        self.expires_at = expires_at
-
-    def is_expired(self) -> bool:
-        """Check if this cache entry is too old and should be deleted."""
-        return datetime.utcnow() >= self.expires_at
