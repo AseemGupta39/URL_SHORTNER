@@ -46,7 +46,7 @@ class PrometheusMiddleware:
             raise ValueError("service_name required")
         self.app = app
         self.service_name = service_name
-        logger.info(f"Prometheus metrics initialized: service={service_name}")
+        logger.info("Prometheus metrics initialized", extra={"service_name": service_name})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

@@ -28,7 +28,7 @@ _concurrency_limiter = (
     if settings.max_concurrent_requests > 0
     else None
 )
-logger.info(f"Concurrency limiter: {settings.max_concurrent_requests or 'unlimited'}")
+logger.info("Concurrency limiter configured", extra={"max_concurrent_requests": settings.max_concurrent_requests or "unlimited"})
 
 
 @router.get("/{short_code}", tags=["Redirect"])

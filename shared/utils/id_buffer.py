@@ -92,13 +92,7 @@ class IDBuffer:
         self._refill_task = asyncio.create_task(
             self._refill_loop(), name="id_buffer_refill"
         )
-        logger.info(
-            "IDBuffer started: loaded=%d, level=%d, capacity=%d, persist_path=%s",
-            loaded,
-            self._queue.qsize(),
-            self._size,
-            self._persist_path,
-        )
+        logger.info("IDBuffer started", extra={"loaded": loaded, "level": self._queue.qsize(), "capacity": self._size, "persist_path": self._persist_path})
 
     async def stop(self) -> None:
         """
@@ -144,20 +138,13 @@ class IDBuffer:
                 generated += 1
             except RuntimeError as e:
                 # RuntimeError from generator = clock moved backwards or timestamp overflow
-                logger.error(
-                    "IDBuffer: generator raised RuntimeError during fill, stopping: %s", e
-                )
+                logger.error("IDBuffer generator raised RuntimeError during fill, stopping", extra={"error": str(e)})
                 break
             except Exception as e:
-                logger.error(
-                    "IDBuffer: unexpected error during fill after %d IDs: %s",
-                    generated,
-                    e,
-                    exc_info=True,
-                )
+                logger.error("IDBuffer unexpected error during fill", extra={"generated": generated, "error": str(e)}, exc_info=True)
                 break
 
-        logger.debug("IDBuffer: filled %d IDs, level=%d", generated, self._queue.qsize())
+        logger.debug("IDBuffer filled", extra={"generated": generated, "level": self._queue.qsize()})
 
     async def _refill_loop(self) -> None:
         """
@@ -174,20 +161,13 @@ class IDBuffer:
             try:
                 if self._queue.qsize() < self._refill_threshold:
                     needed = self._size - self._queue.qsize()
-                    logger.debug(
-                        "IDBuffer: level=%d below threshold=%d, refilling %d",
-                        self._queue.qsize(),
-                        self._refill_threshold,
-                        needed,
-                    )
+                    logger.debug("IDBuffer level below threshold, refilling", extra={"level": self._queue.qsize(), "threshold": self._refill_threshold, "needed": needed})
                     await self._fill(needed)
                 await asyncio.sleep(0.05)  # check every 50ms
             except asyncio.CancelledError:
                 break  # stop() called — exit cleanly
             except Exception as e:
-                logger.error(
-                    "IDBuffer: refill loop unexpected error: %s", e, exc_info=True
-                )
+                logger.error("IDBuffer refill loop unexpected error", extra={"error": str(e)}, exc_info=True)
                 await asyncio.sleep(0.1)  # back off before retrying
 
     async def _persist(self) -> None:
@@ -208,16 +188,9 @@ class IDBuffer:
         try:
             with open(self._persist_path, "w") as f:
                 f.write("\n".join(ids))
-            logger.info(
-                "IDBuffer: persisted %d unused IDs to %s", len(ids), self._persist_path
-            )
+            logger.info("IDBuffer persisted unused IDs", extra={"count": len(ids), "persist_path": self._persist_path})
         except OSError as e:
-            logger.error(
-                "IDBuffer: failed to persist %d IDs to %s: %s",
-                len(ids),
-                self._persist_path,
-                e,
-            )
+            logger.error("IDBuffer failed to persist IDs", extra={"count": len(ids), "persist_path": self._persist_path, "error": str(e)})
 
     async def _load_persisted(self) -> int:
         """
@@ -237,11 +210,7 @@ class IDBuffer:
             # Normal on first start — no persisted IDs yet
             return 0
         except OSError as e:
-            logger.error(
-                "IDBuffer: failed to read persisted IDs from %s: %s",
-                self._persist_path,
-                e,
-            )
+            logger.error("IDBuffer failed to read persisted IDs", extra={"persist_path": self._persist_path, "error": str(e)})
             return 0
 
         loaded = 0
@@ -255,11 +224,7 @@ class IDBuffer:
         try:
             open(self._persist_path, "w").close()
         except OSError as e:
-            logger.warning(
-                "IDBuffer: could not clear persist file %s: %s", self._persist_path, e
-            )
+            logger.warning("IDBuffer could not clear persist file", extra={"persist_path": self._persist_path, "error": str(e)})
 
-        logger.info(
-            "IDBuffer: loaded %d persisted IDs from %s", loaded, self._persist_path
-        )
+        logger.info("IDBuffer loaded persisted IDs", extra={"loaded": loaded, "persist_path": self._persist_path})
         return loaded

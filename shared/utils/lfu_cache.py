@@ -44,7 +44,7 @@ class LFUCache(Cache):
         self._misses: int = 0
         self._evictions: int = 0
 
-        logger.info("LFUCache initialized: max_size=%d", max_size)
+        logger.info("LFUCache initialized", extra={"max_size": max_size})
 
     def _update_frequency(self, key: str) -> None:
         """
@@ -94,7 +94,7 @@ class LFUCache(Cache):
             del self._freq_buckets[self._min_freq]
 
         self._evictions += 1
-        logger.info("LFUCache: evicted key '%s'", evict_key)
+        logger.info("LFUCache evicted key", extra={"evicted_key": evict_key})
 
     async def get_async(self, key: str) -> Optional[Any]:
         """Get value from cache (async)."""

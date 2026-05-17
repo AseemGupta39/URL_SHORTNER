@@ -59,12 +59,9 @@ class RedisQueue(Queue):
                     socket_connect_timeout=self.socket_connect_timeout
                 )
                 await self._client.ping()
-                logger.info(
-                    f"RedisQueue connected | queue={self.queue_name} | pool_size={self.max_connections} | "
-                    f"timeout={self.socket_timeout}s | connect_time={timer.total():.2f}ms"
-                )
+                logger.info("RedisQueue connected", extra={"queue_name": self.queue_name, "pool_size": self.max_connections, "timeout_seconds": self.socket_timeout, "connect_time_ms": round(timer.total(), 2)})
             except Exception as e:
-                logger.error(f"RedisQueue connection failed: {e} | connect_time={timer.total():.2f}ms")
+                logger.error("RedisQueue connection failed", extra={"error": str(e), "connect_time_ms": round(timer.total(), 2)})
                 raise
 
     async def close(self) -> None:

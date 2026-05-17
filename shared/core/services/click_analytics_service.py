@@ -178,7 +178,7 @@ class ClickAnalyticsService:
         try:
             count = await self.click_repo.get_click_count_for_short_code(short_code)
 
-            logger.info(f"Click count: short_code={short_code} | count={count}")
+            logger.info("Click count retrieved", extra={"short_code": short_code, "count": count})
 
             return count
 

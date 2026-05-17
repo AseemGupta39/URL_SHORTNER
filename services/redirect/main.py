@@ -85,20 +85,20 @@ async def full_health_check() -> dict:
         repository = await get_url_repository()
     except Exception as e:
         repository = None
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
 
     try:
         cache = await get_cache()
     except Exception as e:
         cache = None
-        logger.error(f"Failed to get cache for health check: {e}")
+        logger.error("Failed to get cache for health check", extra={"error": str(e)})
 
     try:
         # Check click queue (redirect service uses it for analytics)
         queue = await get_click_queue()
     except Exception as e:
         queue = None
-        logger.error(f"Failed to get click queue for health check: {e}")
+        logger.error("Failed to get click queue for health check", extra={"error": str(e)})
 
     result = await check_all_dependencies(
         service_name="redirect",
@@ -116,7 +116,7 @@ async def database_health_check() -> dict:
         repository = await get_url_repository()
         result = await check_database(repository)
     except Exception as e:
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -133,7 +133,7 @@ async def redis_health_check() -> dict:
         cache = await get_cache()
         result = await check_redis(cache)
     except Exception as e:
-        logger.error(f"Failed to get cache for health check: {e}")
+        logger.error("Failed to get cache for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -150,7 +150,7 @@ async def queue_health_check() -> dict:
         queue = await get_click_queue()
         result = await check_queue(queue)
     except Exception as e:
-        logger.error(f"Failed to get queue for health check: {e}")
+        logger.error("Failed to get queue for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -179,7 +179,7 @@ async def shutdown_event() -> None:
         instance = _instances.get(key)
         if instance and hasattr(instance, "close"):
             await instance.close()
-            logger.debug(f"{key} closed")
+            logger.debug("Connection closed", extra={"resource": key})
 
     logger.info("Redirect Service shutdown complete")
 

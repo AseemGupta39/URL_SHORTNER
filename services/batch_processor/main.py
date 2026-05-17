@@ -75,20 +75,20 @@ async def full_health_check() -> dict:
         repository = await get_url_repository()
     except Exception as e:
         repository = None
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
 
     try:
         cache = await get_cache()
     except Exception as e:
         cache = None
-        logger.error(f"Failed to get cache for health check: {e}")
+        logger.error("Failed to get cache for health check", extra={"error": str(e)})
 
     try:
         # Check URL queue (batch processor uses it)
         queue = await get_url_queue()
     except Exception as e:
         queue = None
-        logger.error(f"Failed to get URL queue for health check: {e}")
+        logger.error("Failed to get URL queue for health check", extra={"error": str(e)})
 
     result = await check_all_dependencies(
         service_name="batch_processor",
@@ -106,7 +106,7 @@ async def database_health_check() -> dict:
         repository = await get_url_repository()
         result = await check_database(repository)
     except Exception as e:
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -123,7 +123,7 @@ async def redis_health_check() -> dict:
         cache = await get_cache()
         result = await check_redis(cache)
     except Exception as e:
-        logger.error(f"Failed to get cache for health check: {e}")
+        logger.error("Failed to get cache for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -140,7 +140,7 @@ async def queue_health_check() -> dict:
         queue = await get_url_queue()
         result = await check_queue(queue)
     except Exception as e:
-        logger.error(f"Failed to get queue for health check: {e}")
+        logger.error("Failed to get queue for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -186,7 +186,7 @@ async def startup_event() -> None:
     # Pass dependencies to controller
     set_dependencies(url_repo, url_queue, url_dlq)
 
-    logger.info(f"Batch processor ready (batch_size={settings.batch_size})")
+    logger.info("Batch processor ready", extra={"batch_size": settings.batch_size})
 
     if settings.enable_background_scheduler:
         logger.info("Starting background scheduler (dev mode)")

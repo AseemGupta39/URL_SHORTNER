@@ -47,7 +47,7 @@ def get_request_id() -> Optional[str]:
     Example:
         >>> request_id = get_request_id()
         >>> if request_id:
-        ...     logger.info(f"[{request_id}] Processing request")
+        ...     logger.info("Processing request", extra={"request_id": request_id})
     """
     return request_id_var.get()
 
@@ -92,7 +92,7 @@ def get_batch_id() -> Optional[str]:
     Example:
         >>> batch_id = get_batch_id()
         >>> if batch_id:
-        ...     logger.info(f"[{batch_id}] Processing batch")
+        ...     logger.info("Processing batch", extra={"batch_id": batch_id})
     """
     return batch_id_var.get()
 

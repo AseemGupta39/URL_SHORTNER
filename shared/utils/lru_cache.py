@@ -68,7 +68,7 @@ class LRUCache(Cache):
         self._evictions = 0 # How many times we removed old items
 
         # Log initialization
-        logger.info(f"LRUCache initialized (max_size={max_size}, ttl={ttl_seconds}s)")
+        logger.info("LRUCache initialized", extra={"max_size": max_size, "ttl_seconds": ttl_seconds})
 
     async def get_async(self, key: str) -> Optional[Any]:
         """

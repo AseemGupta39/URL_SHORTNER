@@ -76,7 +76,7 @@ async def check_database(repository: SQLiteURLRepository) -> DependencyHealth:
 
     except Exception as e:
         response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-        logger.error(f"Database health check failed: {e}")
+        logger.error("Database health check failed", extra={"error": str(e)})
 
         return DependencyHealth(
             status="unhealthy",
@@ -137,7 +137,7 @@ async def check_redis(cache: Cache) -> DependencyHealth:
 
     except Exception as e:
         response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-        logger.error(f"Redis health check failed: {e}")
+        logger.error("Redis health check failed", extra={"error": str(e)})
 
         return DependencyHealth(
             status="unhealthy",
@@ -195,7 +195,7 @@ async def check_queue(queue: Queue) -> DependencyHealth:
 
     except Exception as e:
         response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-        logger.error(f"Redis queue health check failed: {e}")
+        logger.error("Redis queue health check failed", extra={"error": str(e)})
 
         return DependencyHealth(
             status="unhealthy",

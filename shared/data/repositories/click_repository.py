@@ -137,7 +137,7 @@ class SQLiteClickRepository(ClickRepository):
 
         await self.initialize()
 
-        logger.debug(f"Batch inserting {len(click_data_list)} click events")
+        logger.debug("Batch inserting click events", extra={"count": len(click_data_list)})
 
         async with self.async_session() as session:
             click_models = [
@@ -155,7 +155,7 @@ class SQLiteClickRepository(ClickRepository):
             session.add_all(click_models)
             await session.commit()
 
-        logger.info(f"Batch insert completed: {len(click_data_list)} click events saved")
+        logger.info("Batch insert completed", extra={"count": len(click_data_list)})
 
         return len(click_data_list)
 
@@ -172,7 +172,7 @@ class SQLiteClickRepository(ClickRepository):
         """
         await self.initialize()
 
-        logger.debug(f"Querying clicks for short_code={short_code}, limit={limit}")
+        logger.debug("Querying clicks", extra={"short_code": short_code, "limit": limit})
 
         async with self.async_session() as session:
             stmt = (
@@ -196,7 +196,7 @@ class SQLiteClickRepository(ClickRepository):
                 for click in click_models
             ]
 
-            logger.info(f"Retrieved {len(click_data_list)} clicks for short_code={short_code}")
+            logger.info("Clicks retrieved", extra={"short_code": short_code, "count": len(click_data_list)})
 
             return click_data_list
 
@@ -212,7 +212,7 @@ class SQLiteClickRepository(ClickRepository):
         """
         await self.initialize()
 
-        logger.debug(f"Counting clicks for short_code={short_code}")
+        logger.debug("Counting clicks", extra={"short_code": short_code})
 
         async with self.async_session() as session:
             stmt = (
@@ -223,6 +223,6 @@ class SQLiteClickRepository(ClickRepository):
             result = await session.execute(stmt)
             count = result.scalar_one()
 
-            logger.info(f"Click count for short_code={short_code}: {count}")
+            logger.info("Click count retrieved", extra={"short_code": short_code, "count": count})
 
             return count

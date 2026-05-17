@@ -172,7 +172,7 @@ def setup_logging(
         f"Logging configured for service '{service_name}' at level {log_level.upper()}"
     )
     if enable_file:
-        logger.info(f"Log file: {log_file_path}")
+        logger.info("Log file configured", extra={"log_file_path": str(log_file_path)})
 
 
 def _get_json_format() -> str:

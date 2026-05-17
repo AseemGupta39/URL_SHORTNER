@@ -74,13 +74,13 @@ async def full_health_check() -> dict:
         repository = await get_click_repository()
     except Exception as e:
         repository = None
-        logger.error(f"Failed to get click repository for health check: {e}")
+        logger.error("Failed to get click repository for health check", extra={"error": str(e)})
 
     try:
         queue = await get_click_queue()
     except Exception as e:
         queue = None
-        logger.error(f"Failed to get click queue for health check: {e}")
+        logger.error("Failed to get click queue for health check", extra={"error": str(e)})
 
     result = await check_all_dependencies(
         service_name="click_processor",
@@ -98,7 +98,7 @@ async def database_health_check() -> dict:
         repository = await get_click_repository()
         result = await check_database(repository)
     except Exception as e:
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -115,7 +115,7 @@ async def queue_health_check() -> dict:
         queue = await get_click_queue()
         result = await check_queue(queue)
     except Exception as e:
-        logger.error(f"Failed to get queue for health check: {e}")
+        logger.error("Failed to get queue for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -156,7 +156,7 @@ async def startup_event() -> None:
     # Initialize click dead-letter queue (singleton)
     click_dlq = await get_click_dlq()
 
-    logger.info(f"Click processor ready (batch_size={settings.batch_size}, interval={settings.click_batch_interval_seconds}s)")
+    logger.info("Click processor ready", extra={"batch_size": settings.batch_size, "interval_seconds": settings.click_batch_interval_seconds})
 
     if settings.enable_background_scheduler:
         logger.info("Starting click background scheduler (dev mode)")

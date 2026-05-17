@@ -44,9 +44,9 @@ async def _poll_queue_depth() -> None:
         try:
             queue = await get_url_queue()
             depth = await queue.size()
-            logger.info(f"Queue depth: {depth}")
+            logger.info("Queue depth", extra={"depth": depth})
         except Exception as e:
-            logger.error(f"Queue depth poll failed: {e}")
+            logger.error("Queue depth poll failed", extra={"error": str(e)})
 
 # Setup per-service logging
 setup_logging(
@@ -108,19 +108,19 @@ async def full_health_check() -> dict:
         repository = await get_url_repository()
     except Exception as e:
         repository = None
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
 
     try:
         cache = await get_cache()
     except Exception as e:
         cache = None
-        logger.error(f"Failed to get cache for health check: {e}")
+        logger.error("Failed to get cache for health check", extra={"error": str(e)})
 
     try:
         queue = await get_url_queue()
     except Exception as e:
         queue = None
-        logger.error(f"Failed to get queue for health check: {e}")
+        logger.error("Failed to get queue for health check", extra={"error": str(e)})
 
     result = await check_all_dependencies(
         service_name="shorten",
@@ -138,7 +138,7 @@ async def database_health_check() -> dict:
         repository = await get_url_repository()
         result = await check_database(repository)
     except Exception as e:
-        logger.error(f"Failed to get repository for health check: {e}")
+        logger.error("Failed to get repository for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -155,7 +155,7 @@ async def redis_health_check() -> dict:
         cache = await get_cache()
         result = await check_redis(cache)
     except Exception as e:
-        logger.error(f"Failed to get cache for health check: {e}")
+        logger.error("Failed to get cache for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -172,7 +172,7 @@ async def queue_health_check() -> dict:
         queue = await get_url_queue()
         result = await check_queue(queue)
     except Exception as e:
-        logger.error(f"Failed to get queue for health check: {e}")
+        logger.error("Failed to get queue for health check", extra={"error": str(e)})
         from shared.utils.health import DependencyHealth
         result = DependencyHealth(
             status="unhealthy",
@@ -196,7 +196,7 @@ async def startup_event() -> None:
         refill_threshold=settings.id_buffer_refill_threshold,
     )
     asyncio.create_task(_poll_queue_depth())
-    logger.info(f"Queue depth poller started (interval={QUEUE_DEPTH_POLL_INTERVAL}s)")
+    logger.info("Queue depth poller started", extra={"interval_seconds": QUEUE_DEPTH_POLL_INTERVAL})
 
 
 @app.on_event("shutdown")
@@ -209,13 +209,13 @@ async def shutdown_event() -> None:
         instance = _instances.get(key)
         if instance and hasattr(instance, "close"):
             await instance.close()
-            logger.debug(f"{key} closed")
+            logger.debug("Connection closed", extra={"resource": key})
 
     logger.info("Shorten Service shutdown complete")
 
 app.include_router(shorten_router)
 
-logger.info(f"Shorten Service started (DC={settings.datacenter_id}, W={settings.worker_id})")
+logger.info("Shorten Service started", extra={"datacenter_id": settings.datacenter_id, "worker_id": settings.worker_id})
 
 # For local debugging in VSCode (press F5)
 # In production, Vercel imports 'app' directly and this block never runs

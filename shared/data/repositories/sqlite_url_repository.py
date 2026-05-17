@@ -104,11 +104,7 @@ class SQLiteURLRepository(URLRepository):
                 pool_recycle=self.pool_recycle,
                 pool_pre_ping=self.pool_pre_ping,
             )
-            logger.info(
-                f"Database: PostgreSQL with connection pooling "
-                f"(pool_size={self.pool_size}, max_overflow={self.max_overflow}, "
-                f"timeout={self.pool_timeout}s, recycle={self.pool_recycle}s)"
-            )
+            logger.info("Database: PostgreSQL with connection pooling", extra={"pool_size": self.pool_size, "max_overflow": self.max_overflow, "pool_timeout": self.pool_timeout, "pool_recycle": self.pool_recycle})
 
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -117,9 +113,7 @@ class SQLiteURLRepository(URLRepository):
             self.engine, class_=AsyncSession, expire_on_commit=False
         )
 
-        logger.info(
-            f"Database initialized successfully | connect_time={timer.total():.2f}ms"
-        )
+        logger.info("Database initialized successfully", extra={"connect_time_ms": round(timer.total(), 2)})
 
     async def close(self) -> None:
         """Close database connection."""
@@ -143,9 +137,7 @@ class SQLiteURLRepository(URLRepository):
         """
         await self.initialize()
 
-        logger.debug(
-            f"Inserting URL mapping: {url_data.short_code} -> {url_data.original_url}"
-        )
+        logger.debug("Inserting URL mapping", extra={"short_code": url_data.short_code, "original_url": url_data.original_url})
 
         async with self.async_session() as session:
             url_model = URLModel(
@@ -156,9 +148,7 @@ class SQLiteURLRepository(URLRepository):
             session.add(url_model)
             await session.commit()
 
-        logger.info(
-            f"URL mapping saved to database: {url_data.short_code} -> {url_data.original_url}"
-        )
+        logger.info("URL mapping saved to database", extra={"short_code": url_data.short_code, "original_url": url_data.original_url})
 
         return url_data
 
@@ -177,7 +167,7 @@ class SQLiteURLRepository(URLRepository):
 
         await self.initialize()
 
-        logger.debug(f"Batch inserting {len(url_data_list)} URL mappings")
+        logger.debug("Batch inserting URL mappings", extra={"count": len(url_data_list)})
 
         async with self.async_session() as session:
             url_models = [
@@ -191,7 +181,7 @@ class SQLiteURLRepository(URLRepository):
             session.add_all(url_models)
             await session.commit()
 
-        logger.info(f"Batch insert completed: {len(url_data_list)} URL mappings saved")
+        logger.info("Batch insert completed", extra={"count": len(url_data_list)})
 
         return len(url_data_list)
 
@@ -207,7 +197,7 @@ class SQLiteURLRepository(URLRepository):
         """
         await self.initialize()
 
-        logger.debug(f"Looking up short code in database: {short_code}")
+        logger.debug("Looking up short code in database", extra={"short_code": short_code})
 
         async with self.async_session() as session:
             stmt = select(URLModel).where(URLModel.short_code == short_code)
@@ -215,12 +205,10 @@ class SQLiteURLRepository(URLRepository):
             url_model = result.scalar_one_or_none()
 
             if url_model is None:
-                logger.debug(f"Short code not found in database: {short_code}")
+                logger.debug("Short code not found in database", extra={"short_code": short_code})
                 return None
 
-            logger.info(
-                f"URL mapping found in database: {short_code} -> {url_model.original_url}"
-            )
+            logger.info("URL mapping found in database", extra={"short_code": short_code, "original_url": url_model.original_url})
             url_data = URLData(
                 short_code=url_model.short_code,
                 original_url=url_model.original_url,

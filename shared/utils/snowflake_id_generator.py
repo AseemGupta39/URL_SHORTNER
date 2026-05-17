@@ -261,5 +261,5 @@ class SnowflakeIDGenerator(IDGenerator):
         """
         id_value = await self.generate_id()
         short_code = self.encode_base62(id_value)
-        logger.debug(f"Generated short code: {short_code} (ID={id_value})")
+        logger.debug("Generated short code", extra={"short_code": short_code, "id_value": id_value})
         return short_code
