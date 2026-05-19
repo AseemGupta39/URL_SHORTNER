@@ -23,6 +23,7 @@ import logging
 from services.redirect.config import settings  # Service-specific settings
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
+from shared.middleware.canonical_log import CanonicalLogMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_url_repository, get_cache, get_click_queue
 from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
@@ -46,7 +47,9 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add Request ID middleware (must be added before CORS)
+# CanonicalLogMiddleware must be added BEFORE RequestIDMiddleware so it runs
+# inside it — request_id is still set in context when the canonical line fires.
+app.add_middleware(CanonicalLogMiddleware, service_name="redirect")
 app.add_middleware(RequestIDMiddleware)
 
 # Add Prometheus metrics middleware

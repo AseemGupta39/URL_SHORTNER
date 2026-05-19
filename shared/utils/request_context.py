@@ -18,6 +18,10 @@ request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=Non
 # Separate from request_id to maintain end-to-end traceability
 batch_id_var: ContextVar[Optional[str]] = ContextVar('batch_id', default=None)
 
+# Context variable for canonical log fields — one dict per request, written by any layer,
+# drained into a single log line at the end of the request by CanonicalLogMiddleware
+canonical_fields_var: ContextVar[Optional[dict]] = ContextVar('canonical_fields', default=None)
+
 
 def generate_request_id() -> str:
     """
@@ -121,3 +125,25 @@ def clear_batch_id() -> None:
     Useful for cleanup after batch completion.
     """
     batch_id_var.set(None)
+
+
+def init_canonical_fields() -> None:
+    """Start a fresh canonical fields dict for a new request."""
+    canonical_fields_var.set({})
+
+
+def set_canonical_field(key: str, value) -> None:
+    """Add or update a field in the canonical log dict for the current request."""
+    fields = canonical_fields_var.get()
+    if fields is not None:
+        fields[key] = value
+
+
+def get_canonical_fields() -> dict:
+    """Return all canonical fields collected so far for the current request."""
+    return canonical_fields_var.get() or {}
+
+
+def clear_canonical_fields() -> None:
+    """Clear canonical fields after the request is done."""
+    canonical_fields_var.set(None)
