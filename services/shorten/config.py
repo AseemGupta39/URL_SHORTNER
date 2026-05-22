@@ -4,7 +4,6 @@ This service creates short URLs with unique IDs.
 Port: 8001
 """
 from pydantic_settings import BaseSettings
-from pydantic import field_validator, model_validator
 
 
 class ShortenServiceSettings(BaseSettings):

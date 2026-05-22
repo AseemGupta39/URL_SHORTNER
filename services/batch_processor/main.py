@@ -22,7 +22,7 @@ from services.batch_processor.config import get_settings  # Service-specific set
 from shared.utils.logging_config import setup_logging
 from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
-from shared.config.dependencies import get_url_repository, get_cache, get_url_queue, get_click_queue, get_url_dlq
+from shared.config.dependencies import get_url_repository, get_cache, get_url_queue, get_url_dlq
 from shared.data.repositories import URLRepository
 from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
 from services.batch_processor.controllers import batch_router, set_dependencies

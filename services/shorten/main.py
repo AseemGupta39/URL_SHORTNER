@@ -19,7 +19,6 @@ sys.path.insert(0, str(project_root))
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import logging
 
 from services.shorten.config import settings  # Service-specific settings

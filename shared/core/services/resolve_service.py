@@ -7,7 +7,7 @@ IDGenerator, or the URL queue — those are shorten-only concerns.
 from pydantic import HttpUrl
 import logging
 
-from shared.core.schemas import URLData, RedirectResponse
+from shared.core.schemas import RedirectResponse
 from shared.data.repositories import URLRepository
 from shared.utils.interfaces.cache import Cache
 from shared.utils.timer import Timer

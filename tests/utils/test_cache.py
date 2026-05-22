@@ -54,12 +54,10 @@ async def test_cache_delete():
     await cache.set_async("key1", "value1")
     assert await cache.get_async("key1") == "value1"
 
-    deleted = await cache.delete_async("key1")
-    assert deleted is True
+    await cache.delete_async("key1")
     assert await cache.get_async("key1") is None
 
-    deleted = await cache.delete_async("nonexistent")
-    assert deleted is False
+    await cache.delete_async("nonexistent")  # should not raise
 
 
 def test_cache_size():

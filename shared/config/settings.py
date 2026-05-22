@@ -1,8 +1,6 @@
 """
 Application settings configuration.
 """
-import os
-from pathlib import Path
 from typing import Any
 from pydantic_settings import BaseSettings
 from pydantic import field_validator, model_validator, ValidationInfo

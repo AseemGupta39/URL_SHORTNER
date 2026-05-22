@@ -24,7 +24,7 @@ from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_click_repository, get_click_queue, get_click_dlq
 from shared.data.interfaces.click_repository import ClickRepository
-from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
+from shared.utils.health import check_database, check_queue, check_all_dependencies
 from services.batch_processor.click_worker import background_click_batch_processor
 
 settings = get_settings()

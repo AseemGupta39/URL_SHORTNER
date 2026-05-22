@@ -4,14 +4,13 @@ Tests cache-first + queue-based batch processing flow.
 """
 import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from pydantic import HttpUrl
 
 from shared.core.services import ShortenService, ResolveService
 from shared.core.schemas import URLData, ShortenResponse, RedirectResponse
 from shared.core.queue_messages import URLQueueMessage
 from shared.utils.lru_cache import LRUCache
-from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 
 
 @pytest.fixture

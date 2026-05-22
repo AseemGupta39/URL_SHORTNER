@@ -4,7 +4,7 @@ Tests queue operations with mock Redis client.
 """
 import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from shared.utils.redis_queue import RedisQueue
 
 

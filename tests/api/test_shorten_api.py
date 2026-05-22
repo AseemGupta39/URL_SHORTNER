@@ -3,10 +3,9 @@ API tests for Shorten Service endpoints.
 Tests HTTP layer with FastAPI TestClient.
 """
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from datetime import datetime
 from fastapi.testclient import TestClient
-from pydantic import HttpUrl
 
 from shared.core.schemas import ShortenResponse
 

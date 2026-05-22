@@ -2,7 +2,6 @@
 Tests for ClickAnalyticsService — click tracking with fail-open design.
 """
 import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 from shared.core.services.click_analytics_service import ClickAnalyticsService

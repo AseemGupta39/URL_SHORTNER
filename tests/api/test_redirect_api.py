@@ -3,7 +3,7 @@ API tests for Redirect Service endpoints.
 Tests HTTP layer with FastAPI TestClient.
 """
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 

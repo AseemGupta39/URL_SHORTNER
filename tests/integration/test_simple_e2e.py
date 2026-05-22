@@ -12,7 +12,7 @@ import os
 os.environ['REDIS_ENABLED'] = 'true'
 os.environ['REDIS_URL'] = 'rediss://default:AW1fAAIncDI0NTIzMTIxNGYzMmE0ZjdjOGU1OGVmYWQ2OTVlYWU4OXAyMjc5OTk@safe-gecko-27999.upstash.io:6379'
 
-from shared.core.services import ShortenService, ResolveService
+from shared.core.services import ShortenService
 from shared.core.schemas import URLData
 from shared.data.repositories import SQLiteURLRepository
 from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
