@@ -15,7 +15,7 @@ from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.utils.id_buffer import IDBuffer
 from shared.data.repositories import URLRepository, PostgresURLRepository
 from shared.data.interfaces.click_repository import ClickRepository
-from shared.data.repositories.click_repository import SQLiteClickRepository
+from shared.data.repositories.postgres_click_repository import PostgresClickRepository
 from shared.core.services import ShortenService, ResolveService
 from shared.core.services.click_analytics_service import ClickAnalyticsService
 from shared.utils.interfaces.cache import Cache
@@ -167,7 +167,7 @@ async def get_url_repository() -> URLRepository:
 async def get_click_repository() -> ClickRepository:
     async def factory() -> ClickRepository:
         logger.info("Initializing ClickRepository (singleton)")
-        instance = SQLiteClickRepository(
+        instance = PostgresClickRepository(
             db_url=settings.database_url,
             pool_size=settings.db_pool_size,
             max_overflow=settings.db_pool_max_overflow,
