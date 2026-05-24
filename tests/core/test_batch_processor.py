@@ -6,7 +6,7 @@ import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
 
-from shared.data.repositories import SQLiteURLRepository
+from shared.data.interfaces.url_repository import URLRepository
 from shared.core.schemas import URLData
 from shared.core.queue_messages import URLQueueMessage
 
@@ -14,7 +14,7 @@ from shared.core.queue_messages import URLQueueMessage
 @pytest.fixture
 def mock_repository():
     """Create mock URL repository."""
-    repo = AsyncMock(spec=SQLiteURLRepository)
+    repo = AsyncMock(spec=URLRepository)
     repo.batch_create = AsyncMock(return_value=0)
     repo.initialize = AsyncMock()
     repo.close = AsyncMock()

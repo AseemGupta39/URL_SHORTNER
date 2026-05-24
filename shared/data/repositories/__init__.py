@@ -4,9 +4,9 @@ Data repositories for URL shortener.
 This module provides repository implementations for data persistence.
 """
 from shared.data.interfaces.url_repository import URLRepository
-from .sqlite_url_repository import SQLiteURLRepository
+from .postgres_url_repository import PostgresURLRepository
 
 __all__ = [
     'URLRepository',
-    'SQLiteURLRepository'
+    'PostgresURLRepository',
 ]

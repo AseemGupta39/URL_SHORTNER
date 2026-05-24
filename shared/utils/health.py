@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 import logging
 
-from shared.data.repositories.sqlite_url_repository import SQLiteURLRepository
+from shared.data.repositories.postgres_url_repository import PostgresURLRepository
 from shared.utils.interfaces.cache import Cache
 from shared.utils.redis_cache import RedisCache
 from shared.utils.interfaces.queue import Queue
@@ -35,7 +35,7 @@ class ServiceHealth(BaseModel):
     unhealthy_services: Optional[List[str]] = Field(None, description="List of unhealthy dependencies")
 
 
-async def check_database(repository: SQLiteURLRepository) -> DependencyHealth:
+async def check_database(repository: PostgresURLRepository) -> DependencyHealth:
     """
     Check database connectivity and performance.
 
@@ -57,21 +57,11 @@ async def check_database(repository: SQLiteURLRepository) -> DependencyHealth:
 
         response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
-        # Detect database type from connection URL
-        if repository.db_url.startswith("sqlite"):
-            db_type = "SQLite"
-        elif repository.db_url.startswith("postgresql"):
-            db_type = "PostgreSQL"
-        elif repository.db_url.startswith("mysql"):
-            db_type = "MySQL"
-        else:
-            db_type = "Unknown"
-
         return DependencyHealth(
             status="healthy",
             response_time_ms=round(response_time_ms, 2),
-            message=f"{db_type} connection successful",
-            details={"database_type": db_type}
+            message="PostgreSQL connection successful",
+            details={"database_type": "PostgreSQL"}
         )
 
     except Exception as e:
@@ -208,7 +198,7 @@ async def check_queue(queue: Queue) -> DependencyHealth:
 
 async def check_all_dependencies(
     service_name: str,
-    repository: Optional[SQLiteURLRepository] = None,
+    repository: Optional[PostgresURLRepository] = None,
     cache: Optional[Cache] = None,
     queue: Optional[Queue] = None
 ) -> ServiceHealth:

@@ -10,11 +10,11 @@ from pydantic import HttpUrl
 # Set env before imports
 import os
 os.environ['REDIS_ENABLED'] = 'true'
-os.environ['REDIS_URL'] = 'rediss://default:AW1fAAIncDI0NTIzMTIxNGYzMmE0ZjdjOGU1OGVmYWQ2OTVlYWU4OXAyMjc5OTk@safe-gecko-27999.upstash.io:6379'
+os.environ['REDIS_URL'] = 'redis://localhost:6379'
 
 from shared.core.services import ShortenService
 from shared.core.schemas import URLData
-from shared.data.repositories import SQLiteURLRepository
+from shared.data.repositories import PostgresURLRepository
 from shared.utils.snowflake_id_generator import SnowflakeIDGenerator
 from shared.utils.redis_cache import RedisCache
 from shared.utils.redis_queue import RedisQueue
@@ -40,7 +40,7 @@ async def test_end_to_end_batch_flow():
     await queue.connect()
     await queue.clear()  # Clear any old test data
 
-    repo = SQLiteURLRepository(db_url="sqlite+aiosqlite:///:memory:")
+    repo = PostgresURLRepository(db_url="postgresql+asyncpg://urlapp:dev123@127.0.0.1:5432/urls")
     await repo.initialize()
 
     from shared.utils.id_buffer import IDBuffer
