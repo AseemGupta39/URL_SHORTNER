@@ -13,6 +13,7 @@ from shared.core.services import ResolveService
 from shared.core.services.click_analytics_service import ClickAnalyticsService
 from shared.config.dependencies import get_resolve_service, get_click_analytics_service
 from shared.core.exceptions import ShortCodeNotFoundException
+from shared.utils.request_context import set_canonical_field
 from services.redirect.config import settings
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ async def redirect_url(
     # Prevents cache pollution, path traversal, and DoS attacks
     if not SHORT_CODE_PATTERN.match(short_code):
         logger.warning("Invalid short code format", extra={"short_code": short_code})
+        set_canonical_field("short_code", short_code)
         raise HTTPException(
             status_code=400,
             detail="Invalid short code format. Must be exactly 8 alphanumeric characters."
@@ -65,6 +67,7 @@ async def redirect_url(
 
 async def _resolve_and_redirect(short_code, request, url_service, click_service):
     """Resolve short code and redirect. Extracted to avoid code duplication in semaphore branches."""
+    set_canonical_field("short_code", short_code)
     try:
         logger.info("Resolving short code", extra={"short_code": short_code})
         result = await url_service.resolve(short_code)

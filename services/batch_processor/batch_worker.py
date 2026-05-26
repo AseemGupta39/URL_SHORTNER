@@ -52,12 +52,20 @@ async def process_batch_from_queue(
     batch_id = str(uuid.uuid4())[:12]
     request_context.set_batch_id(f"batch-{batch_id}")
 
-    try:
-        queue_size = await queue.size()
-        update_queue_size(queue_size, "batch_processor")
+    timer = Timer()
+    outcome = "unknown"
+    processed = 0
+    failed_parse_count = 0
+    db_time_ms = 0.0
+    queue_size_before = 0
 
-        if queue_size == 0:
+    try:
+        queue_size_before = await queue.size()
+        update_queue_size(queue_size_before, "batch_processor")
+
+        if queue_size_before == 0:
             logger.debug("Queue empty, skipping batch processing")
+            outcome = "empty"
             return {
                 "batch_id": batch_id,
                 "processed": 0,
@@ -69,83 +77,89 @@ async def process_batch_from_queue(
 
         logger.info(
             "Starting batch processing",
-            extra={"batch_id": batch_id, "queue_size": queue_size},
+            extra={"queue_size": queue_size_before},
         )
-
-        timer = Timer()
 
         # Peek at items WITHOUT removing (prevents data loss on DB failure)
         items = await queue.peek(count=batch_size)
 
         if not items:
+            outcome = "empty"
             return {
                 "batch_id": batch_id,
                 "processed": 0,
-                "queue_size_before": queue_size,
-                "queue_size_after": queue_size,
+                "queue_size_before": queue_size_before,
+                "queue_size_after": queue_size_before,
                 "duration_ms": 0,
                 "failed_parse": 0,
             }
 
         # Parse queue messages
         url_data_list = []
-        failed_parse_count = 0
 
         for item in items:
+            # Push the original shorten-request's request_id (carried in the queue
+            # message JSON) into the worker's contextvar for this iteration. The
+            # logging factory will then auto-stamp every log in this loop with the
+            # right request_id — no need to pass it via extras (which would collide
+            # with the factory's stamping). Token + reset prevents leakage to the
+            # next item.
+            item_request_id = item.get("request_id", "") if isinstance(item, dict) else ""
+            request_id_token = request_context.request_id_var.set(item_request_id)
             try:
-                msg = URLQueueMessage(**item)
-
-                # Log individual item with original request_id for end-to-end traceability
-                logger.debug(
-                    "Processing queued URL",
-                    extra={
-                        "short_code": msg.short_code,
-                        "original_url": msg.original_url,
-                    },
-                )
-
-                url_data = URLData(
-                    short_code=msg.short_code,
-                    original_url=msg.original_url,
-                    created_at=datetime.fromisoformat(msg.created_at),
-                )
-                url_data_list.append(url_data)
-            except Exception as e:
-                failed_parse_count += 1
-                logger.error(
-                    "Failed to parse queue message",
-                    extra={
-                        "error": str(e),
-                        "request_id": item.get("request_id", "unknown"),
-                    },
-                    exc_info=True,
-                )
-
-                # Move failed message to dead-letter queue for later inspection
                 try:
-                    dlq_msg = DeadLetterQueueMessage.from_failed_parse(
-                        original_message=item, exception=e, batch_id=batch_id
-                    )
-                    await dlq.enqueue(dlq_msg.to_dict())
-                    logger.info(
-                        "Moved failed message to DLQ",
-                        extra={"error_type": dlq_msg.error_type},
-                    )
-                except Exception as dlq_error:
-                    logger.critical("Message lost: failed to enqueue to DLQ", extra={"error": str(dlq_error), "lost_message": item}, exc_info=True)
+                    msg = URLQueueMessage(**item)
 
-                continue
+                    logger.debug(
+                        "Processing queued URL",
+                        extra={
+                            "short_code": msg.short_code,
+                            "original_url": msg.original_url,
+                        },
+                    )
+
+                    url_data = URLData(
+                        short_code=msg.short_code,
+                        original_url=msg.original_url,
+                        created_at=datetime.fromisoformat(msg.created_at),
+                    )
+                    url_data_list.append(url_data)
+                except Exception as e:
+                    failed_parse_count += 1
+                    logger.error(
+                        "Failed to parse queue message",
+                        extra={"error": str(e)},
+                        exc_info=True,
+                    )
+
+                    # Move failed message to dead-letter queue for later inspection
+                    try:
+                        dlq_msg = DeadLetterQueueMessage.from_failed_parse(
+                            original_message=item, exception=e, batch_id=batch_id
+                        )
+                        await dlq.enqueue(dlq_msg.to_dict())
+                        logger.info(
+                            "Moved failed message to DLQ",
+                            extra={"error_type": dlq_msg.error_type},
+                        )
+                    except Exception as dlq_error:
+                        logger.critical("Message lost: failed to enqueue to DLQ", extra={"error": str(dlq_error), "lost_message": item}, exc_info=True)
+
+                    continue
+            finally:
+                request_context.request_id_var.reset(request_id_token)
 
         if len(url_data_list) == 0:
             logger.warning(
                 "All queue items failed to parse",
-                extra={"batch_id": batch_id, "failed_count": failed_parse_count},
+                extra={"failed_count": failed_parse_count},
             )
+            outcome = "all_parse_failed"
             return {
                 "batch_id": batch_id,
                 "processed": 0,
-                "queue_size_before": queue_size,
-                "queue_size_after": queue_size,
+                "queue_size_before": queue_size_before,
+                "queue_size_after": queue_size_before,
                 "duration_ms": 0,
                 "failed_parse": failed_parse_count,
             }
@@ -155,8 +169,8 @@ async def process_batch_from_queue(
 
         try:
             inserted_count = await url_repo.batch_create(url_data_list)
-            db_duration = db_timer.total()
-            db_duration_seconds = db_duration / 1000
+            db_time_ms = db_timer.total()
+            db_duration_seconds = db_time_ms / 1000
 
             # Track DB operation with timing
             track_db_operation(
@@ -181,43 +195,46 @@ async def process_batch_from_queue(
             # Track business event
             track_batch_processed(inserted_count, "batch_processor")
 
-            logger.info(
-                "Batch INSERT successful",
-                extra={
-                    "batch_id": batch_id,
-                    "inserted": inserted_count,
-                    "db_time_ms": round(db_duration, 2),
-                    "total_time_ms": round(total_duration, 2),
-                    "queue_size": remaining_size,
-                    "failed_parse": failed_parse_count,
-                },
-            )
+            outcome = "success"
+            processed = inserted_count
 
             return {
                 "batch_id": batch_id,
                 "processed": inserted_count,
-                "queue_size_before": queue_size,
+                "queue_size_before": queue_size_before,
                 "queue_size_after": remaining_size,
                 "duration_ms": int(total_duration),
                 "failed_parse": failed_parse_count,
             }
 
         except Exception as e:
-            db_duration = db_timer.total()
+            db_time_ms = db_timer.total()
             pool_status = url_repo.get_pool_status()
             logger.error(
                 "Batch INSERT failed",
                 extra={
-                    "batch_id": batch_id,
                     "count": len(url_data_list),
-                    "db_time_ms": round(db_duration, 2),
+                    "db_time_ms": round(db_time_ms, 2),
                     "error": str(e),
                 },
                 exc_info=True,
             )
+            outcome = "failed"
             raise
 
     finally:
+        # NOTE: batch_id is already on every LogRecord via the factory in
+        # logging_config.py (set via set_batch_id above). Adding it here
+        # would raise KeyError.
+        logger.info("canonical", extra={
+            "outcome": outcome,
+            "processed": processed,
+            "failed_parse": failed_parse_count,
+            "queue_size_before": queue_size_before,
+            "db_time_ms": round(db_time_ms, 2),
+            "duration_ms": round(timer.total(), 2),
+            "worker": "url_batch",
+        })
         request_context.clear_batch_id()
 
 

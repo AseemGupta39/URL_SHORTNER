@@ -15,6 +15,7 @@ from shared.utils.interfaces.cache import Cache
 from shared.utils.interfaces.queue import Queue
 from shared.utils.id_buffer import IDBuffer
 from shared.utils.timer import Timer
+from shared.utils.request_context import set_canonical_field
 from shared.middleware.metrics import (
     track_cache_operation,
     track_queue_operation,
@@ -71,6 +72,7 @@ class ShortenService:
         try:
             short_code = await self.id_buffer.get()
             timer.checkpoint('id_gen')
+            set_canonical_field("short_code", short_code)
             logger.debug("Generated short code", extra={"short_code": short_code, "original_url": str(original_url), "id_gen_time_ms": round(timer.elapsed(end='id_gen'), 2)})
 
             url_data = URLData(
@@ -103,6 +105,7 @@ class ShortenService:
             else:
                 logger.error("Cache WRITE failed", extra={"short_code": short_code, "error": str(cache_result)})
                 track_cache_operation(CacheOperation.SET, CacheResult.FAILURE, self.service_name)
+            set_canonical_field("cache_ok", cache_ok)
 
             # queue raised = failure; None = success (enqueue returns None)
             queue_ok = not isinstance(queue_result, Exception)
@@ -111,10 +114,12 @@ class ShortenService:
                 track_queue_operation(QueueOperation.ENQUEUE, self.service_name)
             else:
                 logger.error("Queue ENQUEUE failed", extra={"short_code": short_code, "error": str(queue_result)})
+            set_canonical_field("queue_ok", queue_ok)
 
             # Fallback: synchronous DB write if queue failed
             if not queue_ok:
                 logger.warning("Using sync DB write (queue failed)", extra={"short_code": short_code})
+                set_canonical_field("db_fallback", True)
                 try:
                     await self.url_repo.batch_create([url_data])
                     logger.info("URL saved to DB (sync fallback)", extra={"short_code": short_code, "original_url": str(original_url)})

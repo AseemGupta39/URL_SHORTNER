@@ -12,6 +12,7 @@ from shared.data.repositories import URLRepository
 from shared.utils.interfaces.cache import Cache
 from shared.utils.timer import Timer
 from shared.core.exceptions import ShortCodeNotFoundException
+from shared.utils.request_context import set_canonical_field
 from shared.middleware.metrics import (
     track_cache_operation,
     track_url_redirected,
@@ -51,12 +52,14 @@ class ResolveService:
             except Exception as cache_err:
                 logger.warning("Cache GET error, falling through to DB", extra={"short_code": short_code, "error": str(cache_err)})
                 track_cache_operation(CacheOperation.GET, CacheResult.FAILURE, self.service_name)
+                set_canonical_field("cache", "error")
                 cached_data = None
 
             if cached_data is not None:
                 logger.debug("Cache HIT", extra={"short_code": short_code, "original_url": cached_data.original_url})
                 track_cache_operation(CacheOperation.GET, CacheResult.HIT, self.service_name)
                 track_url_redirected(self.service_name)
+                set_canonical_field("cache", "hit")
                 return RedirectResponse(
                     original_url=HttpUrl(cached_data.original_url),
                     status="found",
@@ -64,6 +67,7 @@ class ResolveService:
 
             logger.debug("Cache MISS", extra={"short_code": short_code})
             track_cache_operation(CacheOperation.GET, CacheResult.MISS, self.service_name)
+            set_canonical_field("cache", "miss")
 
             db_timer = Timer()
             url_data = await self.url_repo.get_by_short_code(short_code)
@@ -71,9 +75,11 @@ class ResolveService:
 
             if url_data is None:
                 logger.warning("Short code not found", extra={"short_code": short_code, "db_time_ms": round(db_duration, 2)})
+                set_canonical_field("db", "miss")
                 raise ShortCodeNotFoundException(short_code)
 
             logger.info("DB lookup successful", extra={"short_code": short_code, "original_url": url_data.original_url, "db_time_ms": round(db_duration, 2)})
+            set_canonical_field("db", "hit")
 
             # cache warm — fail-open, never blocks the redirect
             try:
