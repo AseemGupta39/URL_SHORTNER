@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # Click Analytics Configuration
     click_batch_interval_seconds: int = 30  # Process click queue every N seconds
 
+    # Batch DB Retry Configuration (exponential backoff: base, base*2, base*4 ...)
+    batch_db_max_retries: int = 3  # Total attempts per batch_create call
+    batch_db_backoff_base_seconds: float = 1.0  # First wait between attempts
+
     # Validators
     @field_validator('datacenter_id')
     @classmethod

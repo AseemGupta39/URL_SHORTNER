@@ -11,6 +11,7 @@ from datetime import datetime
 import logging
 
 from shared.utils.timer import Timer
+from shared.utils.retry import retry_with_backoff
 
 from shared.config.settings import get_settings
 from shared.data.repositories import URLRepository
@@ -168,7 +169,12 @@ async def process_batch_from_queue(
         db_timer = Timer()
 
         try:
-            inserted_count = await url_repo.batch_create(url_data_list)
+            inserted_count = await retry_with_backoff(
+                lambda: url_repo.batch_create(url_data_list),
+                max_retries=settings.batch_db_max_retries,
+                backoff_base_seconds=settings.batch_db_backoff_base_seconds,
+                operation_name="batch_create_urls",
+            )
             db_time_ms = db_timer.total()
             db_duration_seconds = db_time_ms / 1000
 
