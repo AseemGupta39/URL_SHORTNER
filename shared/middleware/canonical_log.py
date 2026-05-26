@@ -13,7 +13,6 @@ from shared.utils.request_context import (
     init_canonical_fields,
     get_canonical_fields,
     clear_canonical_fields,
-    get_request_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,8 +55,9 @@ class CanonicalLogMiddleware:
         finally:
             duration_ms = round(timer.total(), 2)
             fields = get_canonical_fields()
+            # NOTE: request_id is already on every LogRecord via the factory in
+            # logging_config.py. Adding it here would raise KeyError.
             fields.update({
-                "request_id": get_request_id(),
                 "method": scope.get("method", ""),
                 "path": path,
                 "status_code": status_code,
