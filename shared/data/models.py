@@ -3,7 +3,6 @@ SQLAlchemy ORM models for URL shortener database.
 """
 from sqlalchemy import Column, String, DateTime, Index, Text
 from sqlalchemy.orm import declarative_base
-import uuid
 
 
 Base = declarative_base()
@@ -28,8 +27,9 @@ class ClickModel(Base):
 
     __tablename__ = "clicks"
 
-    # UUID as string for DB portability (works with SQLite, Postgres, MySQL)
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    # UUID supplied by the producer (click_analytics_service) so reprocessing
+    # the same queue item is idempotent under ON CONFLICT (id) DO NOTHING.
+    id = Column(String(36), primary_key=True)
     short_code = Column(String(8), nullable=False, index=True)
     original_url = Column(Text, nullable=False)  # Denormalized for performance
     clicked_at = Column(DateTime, nullable=False, index=True)

@@ -142,6 +142,7 @@ async def process_click_batch_from_queue(
                     logger.debug("Processing queued click", extra={"short_code": msg.short_code, "original_url": msg.original_url})
 
                     click_data = ClickData(
+                        click_id=msg.click_id,
                         short_code=msg.short_code,
                         original_url=msg.original_url,
                         clicked_at=datetime.fromisoformat(msg.clicked_at),

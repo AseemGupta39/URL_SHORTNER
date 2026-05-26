@@ -83,6 +83,29 @@ async def test_track_click_queue_message_has_correct_fields(_, service_with_queu
     assert queued["user_agent"] == "TestAgent/1.0"
     assert queued["referrer"] == "https://google.com"
     assert "clicked_at" in queued
+    assert "click_id" in queued
+    assert len(queued["click_id"]) > 0  # non-empty UUID
+
+
+@pytest.mark.asyncio
+@patch("shared.utils.request_context.get_request_id", return_value="req-test")
+async def test_track_click_generates_unique_click_id_per_call(_, service_with_queue, mock_queue):
+    """Two successive track_click calls must produce different click_ids."""
+    await service_with_queue.track_click(
+        short_code="abc12345",
+        original_url="https://example.com",
+        ip_address="1.2.3.4",
+        user_agent="Mozilla/5.0",
+    )
+    await service_with_queue.track_click(
+        short_code="abc12345",
+        original_url="https://example.com",
+        ip_address="1.2.3.4",
+        user_agent="Mozilla/5.0",
+    )
+    first_call = mock_queue.enqueue.call_args_list[0][0][0]
+    second_call = mock_queue.enqueue.call_args_list[1][0][0]
+    assert first_call["click_id"] != second_call["click_id"]
 
 
 @pytest.mark.asyncio
@@ -143,6 +166,7 @@ async def test_track_click_no_queue_batch_create_receives_click_data(service_no_
     assert click.short_code == "abc12345"
     assert click.ip_address == "10.0.0.1"
     assert click.referrer == "https://referrer.com"
+    assert len(click.click_id) > 0  # sync fallback must also set click_id
 
 
 # ---------------------------------------------------------------------------

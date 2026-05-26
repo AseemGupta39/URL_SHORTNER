@@ -59,6 +59,7 @@ class URLData(BaseModel):
 
 class ClickData(BaseModel):
     """Domain model for click analytics data (before persistence)."""
+    click_id: str  # Producer-generated UUID; used as DB PK for idempotent inserts
     short_code: str
     original_url: str
     clicked_at: datetime
@@ -69,6 +70,7 @@ class ClickData(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
+                "click_id": "550e8400-e29b-41d4-a716-446655440000",
                 "short_code": "abc12345",
                 "original_url": "https://example.com/very/long/path",
                 "clicked_at": "2024-01-15T10:30:00Z",

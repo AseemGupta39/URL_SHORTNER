@@ -1,6 +1,7 @@
 """
 Click Analytics Service - Handles click tracking and analytics business logic.
 """
+import uuid
 from datetime import datetime
 from typing import Optional
 import logging
@@ -76,11 +77,15 @@ class ClickAnalyticsService:
         """
         try:
             clicked_at = datetime.utcnow()
+            # Producer-side ID — survives the queue, used as DB PK so reprocessing
+            # the same queue item after a crash is a no-op (ON CONFLICT DO NOTHING).
+            click_id = str(uuid.uuid4())
 
             # Try to queue for batch processing
             if self.queue:
                 try:
                     queue_msg = ClickQueueMessage.from_click_data(
+                        click_id=click_id,
                         short_code=short_code,
                         original_url=original_url,
                         clicked_at=clicked_at,
@@ -105,6 +110,7 @@ class ClickAnalyticsService:
 
             # Fallback: synchronous write (queue unavailable or failed)
             click_data = ClickData(
+                click_id=click_id,
                 short_code=short_code,
                 original_url=original_url,
                 clicked_at=clicked_at,

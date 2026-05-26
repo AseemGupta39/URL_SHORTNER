@@ -3,6 +3,7 @@ Test suite for ClickRepository interface behaviour.
 All tests mock at the ClickRepository interface level — no real DB needed.
 Integration tests against real PostgreSQL live in tests/integration/.
 """
+import uuid
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
@@ -20,6 +21,7 @@ def repo():
 @pytest.fixture
 def sample_click():
     return ClickData(
+        click_id=str(uuid.uuid4()),
         short_code="abc1234",
         original_url="https://example.com/test",
         clicked_at=datetime.now(),
@@ -39,6 +41,7 @@ class TestClickRepositoryBatchCreate:
     async def test_batch_create_returns_inserted_count(self, repo):
         clicks = [
             ClickData(
+                click_id=str(uuid.uuid4()),
                 short_code=f"c{i}",
                 original_url=f"https://example.com/{i}",
                 clicked_at=datetime.now(),
@@ -75,6 +78,7 @@ class TestClickRepositoryBatchCreate:
     async def test_batch_create_large_batch(self, repo):
         clicks = [
             ClickData(
+                click_id=str(uuid.uuid4()),
                 short_code=f"lg{i:04d}",
                 original_url=f"https://example.com/{i}",
                 clicked_at=datetime.now(),
@@ -100,6 +104,7 @@ class TestClickRepositoryBatchCreate:
     @pytest.mark.asyncio
     async def test_batch_create_accepts_optional_referrer_none(self, repo):
         click = ClickData(
+            click_id=str(uuid.uuid4()),
             short_code="direct1",
             original_url="https://example.com",
             clicked_at=datetime.now(),
@@ -112,6 +117,32 @@ class TestClickRepositoryBatchCreate:
         result = await repo.batch_create([click])
 
         assert result == 1
+
+    @pytest.mark.asyncio
+    async def test_batch_create_idempotent_on_reprocess(self, repo):
+        """
+        On a reprocessed batch (crash recovery), all rows already exist
+        because click_id is supplied by the producer and is stable across
+        reprocesses. ON CONFLICT DO NOTHING means 0 rows inserted — no error.
+        """
+        clicks = [
+            ClickData(
+                click_id=str(uuid.uuid4()),
+                short_code=f"dup{i}",
+                original_url=f"https://example.com/{i}",
+                clicked_at=datetime.now(),
+                ip_address="1.1.1.1",
+                user_agent="a",
+                referrer=None,
+            )
+            for i in range(5)
+        ]
+        repo.batch_create.return_value = 0  # all already exist, silently skipped
+
+        result = await repo.batch_create(clicks)
+
+        assert result == 0
+        repo.batch_create.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +182,7 @@ class TestClickRepositoryGetClicksByShortCode:
         """Interface contract: results ordered by clicked_at DESC (newest first)."""
         clicks = [
             ClickData(
+                click_id=str(uuid.uuid4()),
                 short_code="abc1234",
                 original_url="https://example.com",
                 clicked_at=datetime(2026, 1, 3),
@@ -159,6 +191,7 @@ class TestClickRepositoryGetClicksByShortCode:
                 referrer=None,
             ),
             ClickData(
+                click_id=str(uuid.uuid4()),
                 short_code="abc1234",
                 original_url="https://example.com",
                 clicked_at=datetime(2026, 1, 2),
@@ -167,6 +200,7 @@ class TestClickRepositoryGetClicksByShortCode:
                 referrer=None,
             ),
             ClickData(
+                click_id=str(uuid.uuid4()),
                 short_code="abc1234",
                 original_url="https://example.com",
                 clicked_at=datetime(2026, 1, 1),

@@ -42,6 +42,7 @@ class URLQueueMessage(BaseModel):
 
 class ClickQueueMessage(BaseModel):
     """Message format for click analytics data in queue."""
+    click_id: str  # Producer-generated UUID; survives the queue and becomes DB PK
     short_code: str
     original_url: str
     clicked_at: str  # ISO format timestamp
@@ -53,6 +54,7 @@ class ClickQueueMessage(BaseModel):
     @classmethod
     def from_click_data(
         cls,
+        click_id: str,
         short_code: str,
         original_url: str,
         clicked_at: datetime,
@@ -69,6 +71,7 @@ class ClickQueueMessage(BaseModel):
         from shared.utils import request_context
 
         return cls(
+            click_id=click_id,
             short_code=short_code,
             original_url=original_url,
             clicked_at=clicked_at.isoformat(),
@@ -81,6 +84,7 @@ class ClickQueueMessage(BaseModel):
     def to_dict(self) -> dict:
         """Convert to dictionary for queue serialization."""
         return {
+            "click_id": self.click_id,
             "short_code": self.short_code,
             "original_url": self.original_url,
             "clicked_at": self.clicked_at,

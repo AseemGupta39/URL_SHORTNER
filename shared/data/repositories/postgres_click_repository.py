@@ -6,7 +6,9 @@ from datetime import datetime
 import logging
 
 from sqlalchemy import select, func
+from sqlalchemy.orm import class_mapper
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from shared.data.interfaces.click_repository import ClickRepository
 from shared.data.models import ClickModel, Base
@@ -86,6 +88,14 @@ class PostgresClickRepository(ClickRepository):
             logger.debug("Click analytics database connection closed")
 
     async def batch_create(self, click_data_list: List[ClickData]) -> int:
+        """
+        Insert multiple click events in a single statement.
+
+        Uses ON CONFLICT (id) DO NOTHING so reprocessed batches (crash recovery)
+        silently skip already-existing rows. The id (click_id) is producer-supplied
+        and stable across reprocesses, so a duplicate batch becomes a no-op.
+        Returns the number of rows actually inserted — 0 on a full reprocess is correct.
+        """
         if not click_data_list:
             return 0
 
@@ -93,25 +103,36 @@ class PostgresClickRepository(ClickRepository):
 
         logger.debug("Batch inserting click events", extra={"count": len(click_data_list)})
 
+        now = datetime.utcnow()
+        click_models = [
+            ClickModel(
+                id=click_data.click_id,
+                short_code=click_data.short_code,
+                original_url=click_data.original_url,
+                clicked_at=click_data.clicked_at,
+                ip_address=click_data.ip_address,
+                user_agent=click_data.user_agent,
+                referrer=click_data.referrer,
+                created_at=now,
+            )
+            for click_data in click_data_list
+        ]
+
+        values = [
+            {col.key: getattr(m, col.key) for col in class_mapper(ClickModel).columns}
+            for m in click_models
+        ]
+
+        stmt = pg_insert(ClickModel).values(values).on_conflict_do_nothing()
+
         async with self.async_session() as session:
-            click_models = [
-                ClickModel(
-                    short_code=click_data.short_code,
-                    original_url=click_data.original_url,
-                    clicked_at=click_data.clicked_at,
-                    ip_address=click_data.ip_address,
-                    user_agent=click_data.user_agent,
-                    referrer=click_data.referrer,
-                    created_at=datetime.utcnow(),
-                )
-                for click_data in click_data_list
-            ]
-            session.add_all(click_models)
+            result = await session.execute(stmt)
             await session.commit()
 
-        logger.info("Batch insert completed", extra={"count": len(click_data_list)})
+        inserted_count = result.rowcount
+        logger.info("Batch insert completed", extra={"inserted": inserted_count, "sent": len(click_data_list)})
 
-        return len(click_data_list)
+        return inserted_count
 
     async def get_clicks_by_short_code(self, short_code: str, limit: int = 100) -> List[ClickData]:
         await self.initialize()
