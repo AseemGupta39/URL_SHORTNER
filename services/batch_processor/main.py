@@ -24,7 +24,7 @@ from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_url_repository, get_cache, get_url_queue, get_url_dlq
 from shared.data.repositories import URLRepository
-from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
+from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies, ServiceHealth
 from services.batch_processor.controllers import batch_router, set_dependencies
 from services.batch_processor.batch_worker import background_batch_processor
 
@@ -66,7 +66,7 @@ async def health_check() -> dict:
 
 
 @app.get("/health/full")
-async def full_health_check() -> dict:
+async def full_health_check() -> ServiceHealth:
     """
     Comprehensive health check including all dependencies.
     Checks database, Redis cache, and queues connectivity.

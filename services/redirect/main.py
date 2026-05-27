@@ -26,7 +26,7 @@ from shared.middleware.request_id import RequestIDMiddleware
 from shared.middleware.canonical_log import CanonicalLogMiddleware
 from shared.middleware.metrics import PrometheusMiddleware, metrics_endpoint
 from shared.config.dependencies import get_url_repository, get_cache, get_click_queue
-from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies
+from shared.utils.health import check_database, check_redis, check_queue, check_all_dependencies, ServiceHealth
 from services.redirect.controllers import redirect_router
 
 # Setup per-service logging
@@ -79,7 +79,7 @@ async def health_check() -> dict:
 
 
 @app.get("/health/full")
-async def full_health_check() -> dict:
+async def full_health_check() -> ServiceHealth:
     """
     Comprehensive health check including all dependencies.
     Checks database, Redis cache, and queue connectivity.
