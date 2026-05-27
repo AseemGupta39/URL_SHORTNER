@@ -11,6 +11,7 @@ all_parse_failed, success, failed (DB raises).
 """
 
 import logging
+import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock
 
@@ -43,6 +44,7 @@ def make_url_item(short_code: str, url: str = "https://example.com") -> dict:
 
 def make_click_item(short_code: str = "abc123") -> dict:
     return {
+        "click_id": str(uuid.uuid4()),
         "short_code": short_code,
         "original_url": "https://example.com",
         "clicked_at": datetime.now().isoformat(),
