@@ -20,7 +20,7 @@ def mock_redis_client():
     mock_client = AsyncMock()
     mock_client.ping = AsyncMock()
     mock_client.rpush = AsyncMock(return_value=1)
-    mock_client.rpop = AsyncMock(return_value=None)
+    mock_client.lpop = AsyncMock(return_value=None)
     mock_client.llen = AsyncMock(return_value=0)
     mock_client.delete = AsyncMock(return_value=1)
     return mock_client
@@ -76,23 +76,23 @@ async def test_redis_queue_enqueue(redis_url, mock_redis_client):
 
 @pytest.mark.asyncio
 async def test_redis_queue_dequeue_single(redis_url, mock_redis_client):
-    """Test dequeuing single item from Redis queue."""
+    """Test dequeuing single item uses lpop (FIFO — removes oldest)."""
     queue = RedisQueue(redis_url)
     queue._client = mock_redis_client
 
     test_data = {"short_code": "abc123", "original_url": "https://example.com"}
-    mock_redis_client.rpop = AsyncMock(return_value=json.dumps(test_data))
+    mock_redis_client.lpop = AsyncMock(return_value=json.dumps(test_data))
 
     result = await queue.dequeue(count=1)
 
     assert len(result) == 1
     assert result[0] == test_data
-    mock_redis_client.rpop.assert_called_once_with("url_batch_queue")
+    mock_redis_client.lpop.assert_called_once_with("url_batch_queue")
 
 
 @pytest.mark.asyncio
 async def test_redis_queue_dequeue_multiple(redis_url, mock_redis_client):
-    """Test dequeuing multiple items from Redis queue."""
+    """Test dequeuing multiple items uses lpop (FIFO — removes oldest first)."""
     queue = RedisQueue(redis_url)
     queue._client = mock_redis_client
 
@@ -100,7 +100,7 @@ async def test_redis_queue_dequeue_multiple(redis_url, mock_redis_client):
         {"short_code": "abc123", "original_url": "https://example.com"},
         {"short_code": "def456", "original_url": "https://google.com"}
     ]
-    mock_redis_client.rpop = AsyncMock(
+    mock_redis_client.lpop = AsyncMock(
         return_value=[json.dumps(item) for item in test_data]
     )
 
@@ -108,19 +108,57 @@ async def test_redis_queue_dequeue_multiple(redis_url, mock_redis_client):
 
     assert len(result) == 2
     assert result == test_data
-    mock_redis_client.rpop.assert_called_once_with("url_batch_queue", 2)
+    mock_redis_client.lpop.assert_called_once_with("url_batch_queue", 2)
 
 
 @pytest.mark.asyncio
 async def test_redis_queue_dequeue_empty(redis_url, mock_redis_client):
-    """Test dequeuing from empty queue."""
+    """Test dequeuing from empty queue returns empty list."""
     queue = RedisQueue(redis_url)
     queue._client = mock_redis_client
-    mock_redis_client.rpop = AsyncMock(return_value=None)
+    mock_redis_client.lpop = AsyncMock(return_value=None)
 
     result = await queue.dequeue(count=1)
 
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_dequeue_is_fifo(redis_url, mock_redis_client):
+    """
+    dequeue() must return items in FIFO order (oldest first).
+
+    enqueue() uses rpush → items pile up on the right.
+    dequeue() must use lpop → pulls from the left (oldest).
+    RPUSH + RPOP would be a stack (LIFO) — that's the bug this test guards against.
+    """
+    queue = RedisQueue(redis_url)
+    queue._client = mock_redis_client
+
+    first_in  = {"short_code": "aaa", "original_url": "https://first.com"}
+    second_in = {"short_code": "bbb", "original_url": "https://second.com"}
+
+    # Simulate Redis list state after two rpush calls: [first_in, second_in]
+    # lpop pulls from the left → first_in comes out first (FIFO)
+    # rpop would pull from the right → second_in first (LIFO / bug)
+    remaining = [json.dumps(first_in), json.dumps(second_in)]
+
+    async def fake_lpop(name, count=None):
+        if count is not None:
+            items = remaining[:count]
+            del remaining[:count]
+            return items if items else None
+        if remaining:
+            return remaining.pop(0)
+        return None
+
+    mock_redis_client.lpop = AsyncMock(side_effect=fake_lpop)
+
+    first_out  = await queue.dequeue(count=1)
+    second_out = await queue.dequeue(count=1)
+
+    assert first_out[0]["short_code"]  == "aaa", "oldest item must come out first"
+    assert second_out[0]["short_code"] == "bbb", "newest item must come out second"
 
 
 @pytest.mark.asyncio

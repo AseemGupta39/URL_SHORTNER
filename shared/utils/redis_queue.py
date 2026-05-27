@@ -109,13 +109,13 @@ class RedisQueue(Queue):
         timer = Timer()
         try:
             if count == 1:
-                result = await self._client.rpop(self.queue_name)
+                result = await self._client.lpop(self.queue_name)
                 if result:
                     logger.debug("Dequeued 1 item", extra={"queue_name": self.queue_name, "redis_time_ms": round(timer.total(), 2)})
                     return [json.loads(result)]
                 return []
             else:
-                results = await self._client.rpop(self.queue_name, count)
+                results = await self._client.lpop(self.queue_name, count)
                 if results:
                     logger.debug("Dequeued items", extra={"queue_name": self.queue_name, "count": len(results), "redis_time_ms": round(timer.total(), 2)})
                     return [json.loads(item) for item in results]
