@@ -53,7 +53,7 @@ class PostgresURLRepository(URLRepository):
             return
 
         timer = Timer()
-        logger.debug("Initializing PostgreSQL connection")
+        logger.debug("Initializing PostgreSQL connection", extra={"pool_size": self.pool_size, "max_overflow": self.max_overflow})
 
         self.engine = create_async_engine(
             self.db_url,

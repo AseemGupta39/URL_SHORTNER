@@ -145,7 +145,7 @@ async def startup_event() -> None:
     """Initialize connections on startup."""
     global background_task, click_repo, click_queue, click_dlq
 
-    logger.info("Click Processor Service starting up")
+    logger.info("Click Processor Service starting up", extra={"service": "click_processor"})
 
     # Get click repository instance (singleton)
     click_repo = await get_click_repository()
@@ -159,7 +159,7 @@ async def startup_event() -> None:
     logger.info("Click processor ready", extra={"batch_size": settings.batch_size, "interval_seconds": settings.click_batch_interval_seconds})
 
     if settings.enable_background_scheduler:
-        logger.info("Starting click background scheduler (dev mode)")
+        logger.info("Starting click background scheduler (dev mode)", extra={"interval_seconds": settings.click_batch_interval_seconds})
         background_task = asyncio.create_task(
             background_click_batch_processor(
                 click_repo,
@@ -169,7 +169,7 @@ async def startup_event() -> None:
             )
         )
     else:
-        logger.info("Background scheduler disabled (production: use cron or scheduler)")
+        logger.info("Background scheduler disabled (production: use cron or scheduler)", extra={"service": "click_processor"})
 
 
 @app.on_event("shutdown")
@@ -177,7 +177,7 @@ async def shutdown_event() -> None:
     """Close connections on shutdown to prevent resource leaks."""
     global background_task
 
-    logger.info("Click Processor Service shutting down")
+    logger.info("Click Processor Service shutting down", extra={"service": "click_processor"})
 
     if background_task:
         background_task.cancel()
@@ -188,17 +188,17 @@ async def shutdown_event() -> None:
 
     if click_repo:
         await click_repo.close()
-        logger.debug("Click repository closed")
+        logger.debug("Click repository closed", extra={"resource": "click_repository"})
 
     if click_queue:
         await click_queue.close()
-        logger.debug("Click queue closed")
+        logger.debug("Click queue closed", extra={"resource": "click_queue"})
 
     if click_dlq:
         await click_dlq.close()
-        logger.debug("Click DLQ closed")
+        logger.debug("Click DLQ closed", extra={"resource": "click_dlq"})
 
-    logger.info("Click Processor Service shutdown complete")
+    logger.info("Click Processor Service shutdown complete", extra={"service": "click_processor"})
 
 
 if __name__ == "__main__":

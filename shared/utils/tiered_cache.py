@@ -18,7 +18,7 @@ class TieredCache(Cache):
     def __init__(self, l1_cache: Cache, l2_cache: Cache):
         self.l1_cache = l1_cache
         self.l2_cache = l2_cache
-        logger.info("TieredCache initialized with L1 and L2 caches")
+        logger.info("TieredCache initialized with L1 and L2 caches", extra={"l1": type(l1_cache).__name__, "l2": type(l2_cache).__name__})
 
     async def get_async(self, key: str) -> Optional[Any]:
         """

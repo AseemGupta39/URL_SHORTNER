@@ -65,7 +65,7 @@ async def process_batch_from_queue(
         update_queue_size(queue_size_before, "batch_processor")
 
         if queue_size_before == 0:
-            logger.debug("Queue empty, skipping batch processing")
+            logger.debug("Queue empty, skipping batch processing", extra={"batch_id": batch_id})
             outcome = "empty"
             return {
                 "batch_id": batch_id,

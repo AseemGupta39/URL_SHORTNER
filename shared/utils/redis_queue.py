@@ -38,7 +38,8 @@ class RedisQueue(Queue):
         self._client: Optional[aioredis.Redis] = None
 
         logger.info(
-            f"RedisQueue initialized (queue={queue_name}, pool_size={max_connections})"
+            "RedisQueue initialized",
+            extra={"queue_name": queue_name, "pool_size": max_connections},
         )
 
     async def connect(self) -> None:
@@ -69,7 +70,7 @@ class RedisQueue(Queue):
         if self._client:
             await self._client.close()
             self._client = None
-            logger.info("RedisQueue disconnected")
+            logger.info("RedisQueue disconnected", extra={"queue_name": self.queue_name})
 
     async def enqueue(self, data: Dict[str, Any]) -> None:
         """

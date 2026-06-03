@@ -51,7 +51,7 @@ class PostgresClickRepository(ClickRepository):
         if self.engine is not None:
             return
 
-        logger.debug("Initializing click analytics PostgreSQL connection")
+        logger.debug("Initializing click analytics PostgreSQL connection", extra={"pool_size": self.pool_size, "max_overflow": self.max_overflow})
 
         self.engine = create_async_engine(
             self.db_url,
@@ -85,7 +85,7 @@ class PostgresClickRepository(ClickRepository):
             await self.engine.dispose()
             self.engine = None
             self.async_session = None
-            logger.debug("Click analytics database connection closed")
+            logger.debug("Click analytics database connection closed", extra={"component": "postgres_click_repository"})
 
     async def batch_create(self, click_data_list: List[ClickData]) -> int:
         """

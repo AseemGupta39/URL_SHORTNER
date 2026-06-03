@@ -84,13 +84,25 @@ class SnowflakeIDGenerator(IDGenerator):
 
         # Log initialization details
         logger.info(
-            f"SnowflakeIDGenerator initialized: DC={datacenter_id}, W={worker_id}, "
-            f"epoch={epoch_sec}, bits=[ts:{timestamp_bits}, dc:{datacenter_bits}, "
-            f"w:{worker_bits}, seq:{sequence_bits}]"
+            "SnowflakeIDGenerator initialized",
+            extra={
+                "datacenter_id": datacenter_id,
+                "worker_id": worker_id,
+                "epoch_sec": epoch_sec,
+                "timestamp_bits": timestamp_bits,
+                "datacenter_bits": datacenter_bits,
+                "worker_bits": worker_bits,
+                "sequence_bits": sequence_bits,
+            },
         )
         logger.info(
-            f"Max values: DC={self.max_datacenter_id}, W={self.max_worker_id}, "
-            f"seq={self.max_sequence}, timestamp={self.max_timestamp}"
+            "SnowflakeIDGenerator max values",
+            extra={
+                "max_datacenter_id": self.max_datacenter_id,
+                "max_worker_id": self.max_worker_id,
+                "max_sequence": self.max_sequence,
+                "max_timestamp": self.max_timestamp,
+            },
         )
 
     def _current_timestamp_sec(self) -> int:
@@ -129,8 +141,12 @@ class SnowflakeIDGenerator(IDGenerator):
             # Clock moved backwards
             if timestamp < self.last_timestamp:
                 logger.error(
-                    f"Clock moved backwards! Last={self.last_timestamp}, Current={timestamp}, "
-                    f"Diff={self.last_timestamp - timestamp}s"
+                    "Clock moved backwards",
+                    extra={
+                        "last_timestamp": self.last_timestamp,
+                        "current_timestamp": timestamp,
+                        "diff_seconds": self.last_timestamp - timestamp,
+                    },
                 )
                 raise RuntimeError(
                     f"Clock moved backwards. Refusing to generate ID. "
@@ -144,7 +160,8 @@ class SnowflakeIDGenerator(IDGenerator):
                 # Sequence exhausted - wait for next second
                 if self.sequence == 0:
                     logger.warning(
-                        f"Sequence exhausted ({self.max_sequence + 1} IDs/sec), waiting for next second"
+                        "Sequence exhausted, waiting for next second",
+                        extra={"max_sequence": self.max_sequence, "ids_per_sec": self.max_sequence + 1},
                     )
                     timestamp = await self._wait_next_second(self.last_timestamp)
             else:
@@ -159,7 +176,8 @@ class SnowflakeIDGenerator(IDGenerator):
             # Check timestamp overflow
             if relative_timestamp > self.max_timestamp:
                 logger.error(
-                    f"Timestamp overflow! Relative={relative_timestamp}, Max={self.max_timestamp}"
+                    "Timestamp overflow",
+                    extra={"relative_timestamp": relative_timestamp, "max_timestamp": self.max_timestamp},
                 )
                 raise RuntimeError(
                     f"Timestamp overflow. Relative timestamp {relative_timestamp} "
@@ -168,7 +186,8 @@ class SnowflakeIDGenerator(IDGenerator):
 
             if relative_timestamp < 0:
                 logger.error(
-                    f"Timestamp before epoch! Current={timestamp}, Epoch={self.epoch_sec}"
+                    "Timestamp before epoch",
+                    extra={"current_timestamp": timestamp, "epoch_sec": self.epoch_sec},
                 )
                 raise RuntimeError(
                     f"Current timestamp {timestamp} is before epoch {self.epoch_sec}"
@@ -194,14 +213,26 @@ class SnowflakeIDGenerator(IDGenerator):
         # Log timing for slow requests (>50ms wait = likely contention)
         if wait_time > 50:
             logger.warning(
-                f"ID Gen SLOW: wait={wait_time:.2f}ms, work={work_time:.2f}ms, "
-                f"release={release_time:.2f}ms, seq={self.sequence}"
+                "ID Gen SLOW",
+                extra={
+                    "wait_ms": round(wait_time, 2),
+                    "work_ms": round(work_time, 2),
+                    "release_ms": round(release_time, 2),
+                    "sequence": self.sequence,
+                },
             )
         else:
             logger.debug(
-                f"Generated ID: {id_value} [ts={relative_timestamp}, dc={self.datacenter_id}, "
-                f"w={self.worker_id}, seq={self.sequence}] | "
-                f"wait={wait_time:.2f}ms, work={work_time:.2f}ms"
+                "Generated ID",
+                extra={
+                    "id_value": id_value,
+                    "relative_timestamp": relative_timestamp,
+                    "datacenter_id": self.datacenter_id,
+                    "worker_id": self.worker_id,
+                    "sequence": self.sequence,
+                    "wait_ms": round(wait_time, 2),
+                    "work_ms": round(work_time, 2),
+                },
             )
 
         return id_value

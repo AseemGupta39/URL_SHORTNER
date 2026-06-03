@@ -172,7 +172,7 @@ async def startup_event() -> None:
     """Initialize connections on startup."""
     global background_task, url_repo, url_queue, url_dlq
 
-    logger.info("Batch Processor Service starting up")
+    logger.info("Batch Processor Service starting up", extra={"service": "batch_processor"})
 
     # Get repository instance (singleton)
     url_repo = await get_url_repository()
@@ -189,10 +189,10 @@ async def startup_event() -> None:
     logger.info("Batch processor ready", extra={"batch_size": settings.batch_size})
 
     if settings.enable_background_scheduler:
-        logger.info("Starting background scheduler (dev mode)")
+        logger.info("Starting background scheduler (dev mode)", extra={"interval_seconds": settings.batch_interval_seconds})
         background_task = asyncio.create_task(background_batch_processor(url_repo, url_queue, url_dlq))
     else:
-        logger.info("Background scheduler disabled (production: use cron or scheduler)")
+        logger.info("Background scheduler disabled (production: use cron or scheduler)", extra={"service": "batch_processor"})
 
 
 @app.on_event("shutdown")
@@ -200,7 +200,7 @@ async def shutdown_event() -> None:
     """Close connections on shutdown to prevent resource leaks."""
     global background_task
 
-    logger.info("Batch Processor Service shutting down")
+    logger.info("Batch Processor Service shutting down", extra={"service": "batch_processor"})
 
     if background_task:
         background_task.cancel()
@@ -210,17 +210,17 @@ async def shutdown_event() -> None:
             pass
 
     await url_repo.close()
-    logger.debug("URL repository closed")
+    logger.debug("URL repository closed", extra={"resource": "url_repository"})
 
     if url_queue:
         await url_queue.close()
-        logger.debug("URL queue closed")
+        logger.debug("URL queue closed", extra={"resource": "url_queue"})
 
     if url_dlq:
         await url_dlq.close()
-        logger.debug("URL DLQ closed")
+        logger.debug("URL DLQ closed", extra={"resource": "url_dlq"})
 
-    logger.info("Batch Processor Service shutdown complete")
+    logger.info("Batch Processor Service shutdown complete", extra={"service": "batch_processor"})
 
 
 if __name__ == "__main__":

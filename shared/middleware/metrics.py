@@ -78,9 +78,14 @@ class PrometheusMiddleware:
                 method=method, endpoint=path, status_code=500, service=self.service_name
             ).inc()
             logger.error(
-                f"HTTP error: method={method} | endpoint={path} | "
-                f"duration={duration:.2f}ms | error={str(e)}",
-                exc_info=True
+                "HTTP error",
+                extra={
+                    "method": method,
+                    "endpoint": path,
+                    "duration_ms": round(duration, 2),
+                    "error": str(e),
+                },
+                exc_info=True,
             )
             raise
         else:
@@ -92,14 +97,19 @@ class PrometheusMiddleware:
                 method=method, endpoint=path, service=self.service_name
             ).observe(duration / 1000)
             logger.debug(
-                f"HTTP metric: method={method} | endpoint={path} | "
-                f"status={status_code} | duration={duration:.2f}ms"
+                "HTTP metric",
+                extra={
+                    "method": method,
+                    "endpoint": path,
+                    "status_code": status_code,
+                    "duration_ms": round(duration, 2),
+                },
             )
 
 
 def metrics_endpoint() -> Response:
     """Expose Prometheus metrics at /metrics endpoint."""
-    logger.debug("Metrics endpoint called")
+    logger.debug("Metrics endpoint called", extra={"endpoint": "/metrics"})
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

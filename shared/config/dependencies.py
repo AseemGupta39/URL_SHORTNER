@@ -63,7 +63,7 @@ async def _get_singleton(key: str, factory: Callable[[], Awaitable[T]]) -> T:
 
 async def get_id_generator() -> IDGenerator:
     async def factory() -> IDGenerator:
-        logger.info("Initializing SnowflakeIDGenerator (singleton)")
+        logger.info("Initializing SnowflakeIDGenerator (singleton)", extra={"datacenter_id": settings.datacenter_id, "worker_id": settings.worker_id})
         return SnowflakeIDGenerator(
             datacenter_id=settings.datacenter_id,
             worker_id=settings.worker_id,
@@ -80,7 +80,7 @@ async def get_cache() -> Cache:
     async def factory() -> Cache:
         if not settings.redis_url:
             raise ValueError("REDIS_URL is required. Redis is fundamental to the architecture.")
-        logger.info("Initializing RedisCache with connection pooling")
+        logger.info("Initializing RedisCache with connection pooling", extra={"pool_size": settings.redis_pool_max_connections, "ttl_seconds": settings.cache_ttl_seconds})
         instance = RedisCache(
             redis_url=settings.redis_url,
             ttl_seconds=settings.cache_ttl_seconds,
@@ -97,7 +97,7 @@ async def get_tiered_cache() -> Cache:
     async def factory() -> Cache:
         l2 = await get_cache()
         l1 = LFUCache(max_size=settings.cache_max_size)
-        logger.info("Initializing TieredCache (L1: LFUCache, L2: RedisCache)")
+        logger.info("Initializing TieredCache (L1: LFUCache, L2: RedisCache)", extra={"l1_max_size": settings.cache_max_size})
         return TieredCache(l1_cache=l1, l2_cache=l2)
     return await _get_singleton("tiered_cache", factory)
 
@@ -121,35 +121,35 @@ async def _make_queue(queue_name: str) -> Queue:
 
 async def get_url_queue() -> Queue:
     async def factory() -> Queue:
-        logger.info("Initializing URL Queue (url_batch_queue)")
+        logger.info("Initializing URL Queue (url_batch_queue)", extra={"queue_name": "url_batch_queue"})
         return await _make_queue("url_batch_queue")
     return await _get_singleton("url_queue", factory)
 
 
 async def get_click_queue() -> Queue:
     async def factory() -> Queue:
-        logger.info("Initializing Click Queue (click_batch_queue)")
+        logger.info("Initializing Click Queue (click_batch_queue)", extra={"queue_name": "click_batch_queue"})
         return await _make_queue("click_batch_queue")
     return await _get_singleton("click_queue", factory)
 
 
 async def get_url_dlq() -> Queue:
     async def factory() -> Queue:
-        logger.info("Initializing URL Dead-Letter Queue (url_batch_queue_dlq)")
+        logger.info("Initializing URL Dead-Letter Queue (url_batch_queue_dlq)", extra={"queue_name": "url_batch_queue_dlq"})
         return await _make_queue("url_batch_queue_dlq")
     return await _get_singleton("url_dlq", factory)
 
 
 async def get_click_dlq() -> Queue:
     async def factory() -> Queue:
-        logger.info("Initializing Click Dead-Letter Queue (click_batch_queue_dlq)")
+        logger.info("Initializing Click Dead-Letter Queue (click_batch_queue_dlq)", extra={"queue_name": "click_batch_queue_dlq"})
         return await _make_queue("click_batch_queue_dlq")
     return await _get_singleton("click_dlq", factory)
 
 
 async def get_url_repository() -> URLRepository:
     async def factory() -> URLRepository:
-        logger.info("Initializing URLRepository (singleton)")
+        logger.info("Initializing URLRepository (singleton)", extra={"pool_size": settings.db_pool_size, "max_overflow": settings.db_pool_max_overflow})
         instance = PostgresURLRepository(
             db_url=settings.database_url,
             pool_size=settings.db_pool_size,
@@ -166,7 +166,7 @@ async def get_url_repository() -> URLRepository:
 
 async def get_click_repository() -> ClickRepository:
     async def factory() -> ClickRepository:
-        logger.info("Initializing ClickRepository (singleton)")
+        logger.info("Initializing ClickRepository (singleton)", extra={"pool_size": settings.db_pool_size, "max_overflow": settings.db_pool_max_overflow})
         instance = PostgresClickRepository(
             db_url=settings.database_url,
             pool_size=settings.db_pool_size,
@@ -187,7 +187,7 @@ async def get_shorten_service(
     queue: Queue = Depends(get_url_queue),
 ) -> ShortenService:
     async def factory() -> ShortenService:
-        logger.info("Initializing ShortenService (singleton)")
+        logger.info("Initializing ShortenService (singleton)", extra={"base_domain": settings.base_domain})
         return ShortenService(
             url_repo=url_repo,
             cache=cache,
@@ -204,7 +204,7 @@ async def get_resolve_service(
     cache: Cache = Depends(get_tiered_cache),
 ) -> ResolveService:
     async def factory() -> ResolveService:
-        logger.info("Initializing ResolveService (singleton)")
+        logger.info("Initializing ResolveService (singleton)", extra={"service": "resolve"})
         return ResolveService(
             url_repo=url_repo,
             cache=cache,
@@ -217,7 +217,7 @@ async def get_click_analytics_service(
     queue: Queue = Depends(get_click_queue),
 ) -> ClickAnalyticsService:
     async def factory() -> ClickAnalyticsService:
-        logger.info("Initializing ClickAnalyticsService (singleton)")
+        logger.info("Initializing ClickAnalyticsService (singleton)", extra={"service": "click_analytics"})
         return ClickAnalyticsService(click_repo=click_repo, queue=queue)
     return await _get_singleton("click_analytics_service", factory)
 
@@ -241,7 +241,7 @@ async def init_id_buffer(size: int = 2000, refill_threshold: int = 700) -> IDBuf
     global _id_buffer_instance
 
     if _id_buffer_instance is not None:
-        logger.warning("init_id_buffer: buffer already initialized, skipping")
+        logger.warning("init_id_buffer: buffer already initialized, skipping", extra={"datacenter_id": settings.datacenter_id, "worker_id": settings.worker_id})
         return _id_buffer_instance
 
     persist_path = f"/tmp/id_buffer_dc{settings.datacenter_id}_w{settings.worker_id}.txt"

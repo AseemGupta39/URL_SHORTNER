@@ -41,9 +41,9 @@ async def ensure_queue_initialized() -> Queue:
     global url_queue
 
     if url_queue is None:
-        logger.info("Lazy-initializing URL queue for serverless environment")
+        logger.info("Lazy-initializing URL queue for serverless environment", extra={"queue_name": "url_batch_queue"})
         url_queue = await get_url_queue()
-        logger.info("URL queue initialized successfully")
+        logger.info("URL queue initialized successfully", extra={"queue_name": "url_batch_queue"})
 
     return url_queue
 
@@ -53,10 +53,10 @@ async def ensure_repo_initialized() -> URLRepository:
     global url_repo
 
     if url_repo is None:
-        logger.info("Lazy-initializing URL repository for serverless environment")
+        logger.info("Lazy-initializing URL repository for serverless environment", extra={"component": "url_repository"})
         url_repo = await get_url_repository()
         await url_repo.initialize()
-        logger.info("URL repository initialized successfully")
+        logger.info("URL repository initialized successfully", extra={"component": "url_repository"})
 
     return url_repo
 
@@ -66,9 +66,9 @@ async def ensure_dlq_initialized() -> Queue:
     global url_dlq
 
     if url_dlq is None:
-        logger.info("Lazy-initializing DLQ for serverless environment")
+        logger.info("Lazy-initializing DLQ for serverless environment", extra={"queue_name": "url_batch_queue_dlq"})
         url_dlq = await get_url_dlq()
-        logger.info("DLQ initialized successfully")
+        logger.info("DLQ initialized successfully", extra={"queue_name": "url_batch_queue_dlq"})
 
     return url_dlq
 
@@ -108,8 +108,9 @@ async def get_status() -> dict:
         }
     except Exception as e:
         logger.error(
-            f"Failed to get batch status: error={str(e)}",
-            exc_info=True
+            "Failed to get batch status",
+            extra={"error": str(e)},
+            exc_info=True,
         )
         return {
             "status": "error",
@@ -159,8 +160,9 @@ async def process_batch() -> JSONResponse:
 
     except Exception as e:
         logger.error(
-            f"Batch processing failed: error={str(e)}",
-            exc_info=True
+            "Batch processing failed",
+            extra={"error": str(e)},
+            exc_info=True,
         )
         raise HTTPException(
             status_code=500,

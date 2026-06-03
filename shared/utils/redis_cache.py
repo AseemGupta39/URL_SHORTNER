@@ -73,7 +73,7 @@ class RedisCache(Cache):
         if self._client:
             await self._client.close()
             self._client = None
-            logger.info("Redis disconnected")
+            logger.info("Redis disconnected", extra={"component": "redis_cache"})
 
     def _make_key(self, key: str) -> str:
         return f"{self.key_prefix}{key}"

@@ -100,7 +100,7 @@ async def process_click_batch_from_queue(
         update_queue_size(queue_size_before, "click_analytics")
 
         if queue_size_before == 0:
-            logger.debug("Click queue empty, skipping batch processing")
+            logger.debug("Click queue empty, skipping batch processing", extra={"batch_id": batch_id})
             outcome = "empty"
             return ClickBatchResult(
                 batch_id=batch_id,
