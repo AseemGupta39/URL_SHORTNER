@@ -204,13 +204,13 @@ async def test_cache_rollback_failure_still_raises_original_db_error(_, service,
 
 
 # ---------------------------------------------------------------------------
-# ID generation fails before short_code is assigned (NameError branch)
+# ID generation fails before short_code is assigned
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 @patch("shared.utils.request_context.get_request_id", return_value="req-test")
 async def test_id_buffer_exception_before_short_code_assigned_raises(_, mock_repository, mock_cache, mock_queue):
-    """When id_buffer.get() raises, short_code is never set — NameError branch in except."""
+    """When id_buffer.get() raises, the original exception propagates and cache/queue are never touched."""
     buf = AsyncMock()
     buf.get = AsyncMock(side_effect=RuntimeError("buffer drained"))
 
@@ -226,6 +226,39 @@ async def test_id_buffer_exception_before_short_code_assigned_raises(_, mock_rep
     with pytest.raises(RuntimeError, match="buffer drained"):
         await svc.shorten(HttpUrl("https://example.com"))
 
-    # Cache and queue should never have been touched
     mock_cache.set_async.assert_not_called()
     mock_queue.enqueue.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch("shared.utils.request_context.get_request_id", return_value="req-test")
+async def test_id_buffer_failure_logs_without_short_code(_, mock_repository, mock_cache, mock_queue):
+    """When id_buffer.get() raises, the error log must not include short_code.
+
+    Confirms the fix: short_code = None before try, so the except block uses
+    `if short_code is not None` instead of a fragile try/except NameError.
+    A NameError from a real typo elsewhere must NOT be silently swallowed.
+    """
+    buf = AsyncMock()
+    buf.get = AsyncMock(side_effect=RuntimeError("buffer drained"))
+
+    svc = ShortenService(
+        url_repo=mock_repository,
+        cache=mock_cache,
+        queue=mock_queue,
+        id_buffer=buf,
+        base_domain="short.ly",
+        base_url_scheme="https",
+    )
+
+    with patch("shared.core.services.shorten_service.logger") as mock_logger:
+        with pytest.raises(RuntimeError, match="buffer drained"):
+            await svc.shorten(HttpUrl("https://example.com"))
+
+    mock_logger.error.assert_called_once()
+    call_kwargs = mock_logger.error.call_args.kwargs
+    logged_extra = call_kwargs.get("extra", {})
+
+    # else branch: no short_code in the log
+    assert "short_code" not in logged_extra
+    assert "original_url" in logged_extra

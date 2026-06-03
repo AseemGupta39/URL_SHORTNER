@@ -69,6 +69,7 @@ class ShortenService:
         timer = Timer()
         logger.info("Shortening URL", extra={"original_url": str(original_url)})
 
+        short_code = None
         try:
             short_code = await self.id_buffer.get()
             timer.checkpoint('id_gen')
@@ -150,9 +151,9 @@ class ShortenService:
             )
 
         except Exception as e:
-            try:
+            if short_code is not None:
                 logger.error("Failed to shorten URL", extra={"short_code": short_code, "original_url": str(original_url), "error": str(e), "total_time_ms": round(timer.total(), 2)}, exc_info=True)
-            except NameError:
-                # short_code wasn't created yet (error during ID generation)
+            else:
+                # short_code was never assigned (error during ID generation)
                 logger.error("Failed to shorten URL", extra={"original_url": str(original_url), "error": str(e), "total_time_ms": round(timer.total(), 2)}, exc_info=True)
             raise
