@@ -17,6 +17,7 @@ pydantic-settings==2.6.1
 # Utilities
 python-dotenv==1.0.1
 colorlog==6.8.2  # Colored logging for better readability
+python-json-logger==3.2.1  # JSONL formatter for structured file logs (production-grade)
 
 # Monitoring & Metrics
 prometheus-client==0.21.0  # Prometheus metrics for observability

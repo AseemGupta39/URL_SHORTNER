@@ -175,7 +175,7 @@ app.include_router(redirect_router)
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     """Close singleton resources on shutdown to prevent leaks."""
-    logger.info("Redirect Service shutting down - closing connections", extra={"service": "redirect"})
+    logger.info("Redirect Service shutting down - closing connections")
 
     from shared.config.dependencies import _instances
     for key in ("url_repository", "cache", "click_queue"):
@@ -184,10 +184,10 @@ async def shutdown_event() -> None:
             await instance.close()
             logger.debug("Connection closed", extra={"resource": key})
 
-    logger.info("Redirect Service shutdown complete", extra={"service": "redirect"})
+    logger.info("Redirect Service shutdown complete")
 
 
-logger.info("Redirect Service started", extra={"service": "redirect"})
+logger.info("Redirect Service started")
 
 # For local debugging in VSCode (press F5)
 # In production, Vercel imports 'app' directly and this block never runs

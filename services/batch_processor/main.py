@@ -172,7 +172,7 @@ async def startup_event() -> None:
     """Initialize connections on startup."""
     global background_task, url_repo, url_queue, url_dlq
 
-    logger.info("Batch Processor Service starting up", extra={"service": "batch_processor"})
+    logger.info("Batch Processor Service starting up")
 
     # Get repository instance (singleton)
     url_repo = await get_url_repository()
@@ -192,7 +192,7 @@ async def startup_event() -> None:
         logger.info("Starting background scheduler (dev mode)", extra={"interval_seconds": settings.batch_interval_seconds})
         background_task = asyncio.create_task(background_batch_processor(url_repo, url_queue, url_dlq))
     else:
-        logger.info("Background scheduler disabled (production: use cron or scheduler)", extra={"service": "batch_processor"})
+        logger.info("Background scheduler disabled (production: use cron or scheduler)")
 
 
 @app.on_event("shutdown")
@@ -200,7 +200,7 @@ async def shutdown_event() -> None:
     """Close connections on shutdown to prevent resource leaks."""
     global background_task
 
-    logger.info("Batch Processor Service shutting down", extra={"service": "batch_processor"})
+    logger.info("Batch Processor Service shutting down")
 
     if background_task:
         background_task.cancel()
@@ -220,7 +220,7 @@ async def shutdown_event() -> None:
         await url_dlq.close()
         logger.debug("URL DLQ closed", extra={"resource": "url_dlq"})
 
-    logger.info("Batch Processor Service shutdown complete", extra={"service": "batch_processor"})
+    logger.info("Batch Processor Service shutdown complete")
 
 
 if __name__ == "__main__":

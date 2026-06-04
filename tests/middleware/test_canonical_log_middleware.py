@@ -79,7 +79,10 @@ def test_canonical_log_emitted_on_200_get(caplog):
     assert rec.status_code == 200
     assert isinstance(rec.duration_ms, float)
     assert rec.duration_ms >= 0.0
-    assert rec.service == "test_svc"
+    # NOTE: `service` is stamped by the LogRecord factory in
+    # logging_config.py (set by setup_logging). This unit test doesn't call
+    # setup_logging, so the factory isn't installed and the field may be
+    # absent. Service-level tests cover the production path.
 
 
 def test_canonical_log_includes_method_path_status(caplog):
@@ -100,16 +103,22 @@ def test_canonical_log_includes_method_path_status(caplog):
     assert rec.status_code == 201
 
 
-def test_canonical_log_omits_service_when_not_set(caplog):
+def test_canonical_log_does_not_pass_service_in_extras(caplog):
+    """
+    The middleware must NOT add `service` to the extras dict — the factory
+    in logging_config.py handles it. This test would have failed with
+    KeyError before the fix; it now passes because the middleware no longer
+    sets `service` and the factory's value (whatever it is in the current
+    test process) is allowed through cleanly.
+    """
     caplog.set_level(logging.INFO)
-    app = make_app(service_name="")
+    app = make_app(service_name="ignored_now")
 
     with TestClient(app) as client:
         client.get("/")
 
-    rec = get_canonical_record(caplog)
-    # 'service' attr should be absent (or empty) when service_name=""
-    assert not hasattr(rec, "service") or rec.service in (None, "")
+    # Must produce exactly one canonical record without raising KeyError.
+    get_canonical_record(caplog)
 
 
 # ---------------------------------------------------------------------------

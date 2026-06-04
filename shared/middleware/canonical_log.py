@@ -55,15 +55,14 @@ class CanonicalLogMiddleware:
         finally:
             duration_ms = round(timer.total(), 2)
             fields = get_canonical_fields()
-            # NOTE: request_id is already on every LogRecord via the factory in
-            # logging_config.py. Adding it here would raise KeyError.
+            # NOTE: request_id, batch_id, and service are already on every
+            # LogRecord via the factory in logging_config.py. Adding them
+            # here would raise KeyError.
             fields.update({
                 "method": scope.get("method", ""),
                 "path": path,
                 "status_code": status_code,
                 "duration_ms": duration_ms,
             })
-            if self.service_name:
-                fields["service"] = self.service_name
             logger.info("canonical", extra=fields)
             clear_canonical_fields()

@@ -204,7 +204,7 @@ async def get_resolve_service(
     cache: Cache = Depends(get_tiered_cache),
 ) -> ResolveService:
     async def factory() -> ResolveService:
-        logger.info("Initializing ResolveService (singleton)", extra={"service": "resolve"})
+        logger.info("Initializing ResolveService (singleton)", extra={"subsystem": "resolve"})
         return ResolveService(
             url_repo=url_repo,
             cache=cache,
@@ -217,7 +217,7 @@ async def get_click_analytics_service(
     queue: Queue = Depends(get_click_queue),
 ) -> ClickAnalyticsService:
     async def factory() -> ClickAnalyticsService:
-        logger.info("Initializing ClickAnalyticsService (singleton)", extra={"service": "click_analytics"})
+        logger.info("Initializing ClickAnalyticsService (singleton)", extra={"subsystem": "click_analytics"})
         return ClickAnalyticsService(click_repo=click_repo, queue=queue)
     return await _get_singleton("click_analytics_service", factory)
 

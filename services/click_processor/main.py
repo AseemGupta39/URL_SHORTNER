@@ -145,7 +145,7 @@ async def startup_event() -> None:
     """Initialize connections on startup."""
     global background_task, click_repo, click_queue, click_dlq
 
-    logger.info("Click Processor Service starting up", extra={"service": "click_processor"})
+    logger.info("Click Processor Service starting up")
 
     # Get click repository instance (singleton)
     click_repo = await get_click_repository()
@@ -169,7 +169,7 @@ async def startup_event() -> None:
             )
         )
     else:
-        logger.info("Background scheduler disabled (production: use cron or scheduler)", extra={"service": "click_processor"})
+        logger.info("Background scheduler disabled (production: use cron or scheduler)")
 
 
 @app.on_event("shutdown")
@@ -177,7 +177,7 @@ async def shutdown_event() -> None:
     """Close connections on shutdown to prevent resource leaks."""
     global background_task
 
-    logger.info("Click Processor Service shutting down", extra={"service": "click_processor"})
+    logger.info("Click Processor Service shutting down")
 
     if background_task:
         background_task.cancel()
@@ -198,7 +198,7 @@ async def shutdown_event() -> None:
         await click_dlq.close()
         logger.debug("Click DLQ closed", extra={"resource": "click_dlq"})
 
-    logger.info("Click Processor Service shutdown complete", extra={"service": "click_processor"})
+    logger.info("Click Processor Service shutdown complete")
 
 
 if __name__ == "__main__":

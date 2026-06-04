@@ -17,23 +17,31 @@ try:
 except ImportError:
     HAS_COLORLOG = False
 
+try:
+    from pythonjsonlogger import jsonlogger
+    HAS_JSON_LOGGER = True
+except ImportError:
+    HAS_JSON_LOGGER = False
+
 
 # Store original LogRecord factory
 _original_log_record_factory = logging.getLogRecordFactory()
+
+_SERVICE_NAME: str = ""
 
 
 def _context_aware_log_record(*args, **kwargs) -> logging.LogRecord:
     """
     Custom LogRecord factory that automatically adds context variables to log records.
 
-    This makes context data (like request_id, batch_id, etc.) available in all log messages
-    without needing to pass them manually or use filters.
+    This makes context data (like request_id, batch_id, service, etc.) available in
+    every log message without needing to pass them manually or use filters.
 
     Extensible: Just add more context getters here as needed.
     """
     record = _original_log_record_factory(*args, **kwargs)
 
-    # Add request ID from context
+    # Add request ID + batch ID from contextvars; service name from module global.
     try:
         from shared.utils.request_context import get_request_id, get_batch_id
 
@@ -45,6 +53,8 @@ def _context_aware_log_record(*args, **kwargs) -> logging.LogRecord:
     except (ImportError, Exception):
         record.request_id = "-"
         record.batch_id = "-"
+
+    record.service = _SERVICE_NAME if _SERVICE_NAME else "-"
 
     # Future: Add more context variables here as needed
     # record.user_id = get_user_id() or "-"
@@ -87,6 +97,8 @@ def setup_logging(
         >>> logger.info("Service started")
     """
     # Install custom LogRecord factory to add context variables
+    global _SERVICE_NAME
+    _SERVICE_NAME = service_name
     logging.setLogRecordFactory(_context_aware_log_record)
 
     # Get root logger
@@ -132,6 +144,12 @@ def setup_logging(
 
     # File handler with rotation and date-based directories
     if enable_file:
+        if not HAS_JSON_LOGGER:
+            raise RuntimeError(
+                "python-json-logger is required for file logging. "
+                "Install it with: pip install python-json-logger"
+            )
+
         # Create date-based directory structure: logs/{service}/YYYY/MM/DD/
         now = datetime.utcnow()
         log_dir = os.path.join(
@@ -143,9 +161,9 @@ def setup_logging(
         )
         os.makedirs(log_dir, exist_ok=True)
 
-        # Create log file path
+        # Create log file path — JSONL extension makes the format obvious
         if log_filename is None:
-            log_filename = f"{service_name}.log"
+            log_filename = f"{service_name}.jsonl"
         log_file_path = os.path.join(log_dir, log_filename)
 
         # Rotating file handler
@@ -157,8 +175,22 @@ def setup_logging(
         )
         file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
-        # Use standard formatter for file logs (no colors - clean text)
-        file_formatter = logging.Formatter(log_format, datefmt=date_format)
+        # File logs as JSONL — one JSON object per line. Every key passed via
+        # extra={} (outcome, processed, db_time_ms, short_code, etc.) is
+        # preserved. Ready to ship to Datadog / Loki / Elasticsearch or query
+        # with `jq`. Console stays human-readable (colored text) above.
+        file_formatter = jsonlogger.JsonFormatter(
+            "%(asctime)s %(levelname)s %(service)s %(request_id)s %(batch_id)s "
+            "%(name)s %(funcName)s %(lineno)d %(message)s",
+            datefmt=date_format,
+            rename_fields={
+                "asctime": "timestamp",
+                "levelname": "level",
+                "funcName": "function",
+                "lineno": "line",
+                "name": "logger",
+            },
+        )
         file_handler.setFormatter(file_formatter)
 
         root_logger.addHandler(file_handler)

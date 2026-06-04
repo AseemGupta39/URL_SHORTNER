@@ -203,7 +203,7 @@ async def startup_event() -> None:
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     """Close singleton resources on shutdown to prevent leaks."""
-    logger.info("Shorten Service shutting down - closing connections", extra={"service": "shorten"})
+    logger.info("Shorten Service shutting down - closing connections")
 
     from shared.config.dependencies import _instances
     for key in ("url_repository", "cache", "url_queue"):
@@ -212,7 +212,7 @@ async def shutdown_event() -> None:
             await instance.close()
             logger.debug("Connection closed", extra={"resource": key})
 
-    logger.info("Shorten Service shutdown complete", extra={"service": "shorten"})
+    logger.info("Shorten Service shutdown complete")
 
 app.include_router(shorten_router)
 
