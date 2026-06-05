@@ -9,7 +9,7 @@ import logging
 import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Any, Optional
 
 try:
     import colorlog
@@ -30,7 +30,7 @@ _original_log_record_factory = logging.getLogRecordFactory()
 _SERVICE_NAME: str = ""
 
 
-def _context_aware_log_record(*args, **kwargs) -> logging.LogRecord:
+def _context_aware_log_record(*args: Any, **kwargs: Any) -> logging.LogRecord:
     """
     Custom LogRecord factory that automatically adds context variables to log records.
 

@@ -64,7 +64,7 @@ class PrometheusMiddleware:
         timer = Timer()
         status_code = 500
 
-        async def send_wrapper(message):
+        async def send_wrapper(message: Send) -> None:
             nonlocal status_code
             if message["type"] == "http.response.start":
                 status_code = message["status"]
@@ -119,7 +119,7 @@ def track_cache_operation(
     operation: CacheOperation,
     result: CacheResult,
     service: str
-):
+) -> None:
     """
     Track cache operation with type-safe enums.
 
@@ -139,7 +139,7 @@ def track_db_operation(
     operation: DBOperation,
     duration_seconds: float,
     service: str
-):
+) -> None:
     """
     Track DB operation with timing and type-safe enums.
 

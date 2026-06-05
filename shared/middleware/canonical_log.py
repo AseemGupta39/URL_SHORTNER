@@ -44,7 +44,7 @@ class CanonicalLogMiddleware:
         timer = Timer()
         status_code = None
 
-        async def send_wrapper(message):
+        async def send_wrapper(message: Send) -> None:
             nonlocal status_code
             if message["type"] == "http.response.start":
                 status_code = message["status"]

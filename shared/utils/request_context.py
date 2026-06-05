@@ -5,7 +5,7 @@ Provides thread-safe context variables that persist across async function calls,
 allowing request IDs to be accessible in all layers without passing as parameters.
 """
 from contextvars import ContextVar
-from typing import Optional
+from typing import Any, Optional
 import uuid
 
 
@@ -132,7 +132,7 @@ def init_canonical_fields() -> None:
     canonical_fields_var.set({})
 
 
-def set_canonical_field(key: str, value) -> None:
+def set_canonical_field(key: str, value: Any) -> None:
     """Add or update a field in the canonical log dict for the current request."""
     fields = canonical_fields_var.get()
     if fields is not None:

@@ -38,7 +38,7 @@ async def redirect_url(
     request: Request,
     url_service: ResolveService = Depends(get_resolve_service),
     click_service: ClickAnalyticsService = Depends(get_click_analytics_service)
-):
+) -> FastAPIRedirect:
     """
     Redirect to original URL using short code and track click analytics.
 
@@ -65,7 +65,12 @@ async def redirect_url(
         return await _resolve_and_redirect(short_code, request, url_service, click_service)
 
 
-async def _resolve_and_redirect(short_code, request, url_service, click_service):
+async def _resolve_and_redirect(
+    short_code: str,
+    request: Request,
+    url_service: ResolveService,
+    click_service: ClickAnalyticsService,
+) -> FastAPIRedirect:
     """Resolve short code and redirect. Extracted to avoid code duplication in semaphore branches."""
     set_canonical_field("short_code", short_code)
     try:

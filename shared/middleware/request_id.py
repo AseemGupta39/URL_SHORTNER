@@ -37,7 +37,7 @@ class RequestIDMiddleware:
         request_id = generate_request_id()
         set_request_id(request_id)
 
-        async def send_wrapper(message):
+        async def send_wrapper(message: Send) -> None:
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
                 headers.append((b"x-request-id", request_id.encode()))

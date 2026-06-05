@@ -61,7 +61,7 @@ class ClickQueueMessage(BaseModel):
         ip_address: str,
         user_agent: str,
         referrer: Optional[str] = None
-    ):
+    ) -> "ClickQueueMessage":
         """
         Create queue message from click data.
 
@@ -110,7 +110,7 @@ class DeadLetterQueueMessage(BaseModel):
         original_message: dict[str, Any],
         exception: Exception,
         batch_id: str
-    ):
+    ) -> "DeadLetterQueueMessage":
         """
         Create DLQ message from a failed parse attempt.
 

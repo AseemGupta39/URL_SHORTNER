@@ -29,7 +29,7 @@ logger.info("Concurrency limiter", extra={"max_concurrent_requests": settings.ma
 async def shorten_url(
     request: ShortenRequest,
     shorten_service: ShortenService = Depends(get_shorten_service)
-):
+) -> ShortenResponse:
     """
     Create a short URL from a long URL.
 

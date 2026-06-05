@@ -98,7 +98,7 @@ class AppLogger:
         }
 
         class ColoredFormatter(logging.Formatter):
-            def format(self, record):
+            def format(self, record: logging.LogRecord) -> str:
                 levelname = record.levelname
                 color = COLORS.get(levelname, '')
                 reset = COLORS['RESET'] if color else ''
@@ -134,7 +134,7 @@ class AppLogger:
         Format: LEVEL | TIMESTAMP | [REQUEST_ID] | FILENAME:LINENO | MESSAGE
         """
         class FileFormatter(logging.Formatter):
-            def format(self, record):
+            def format(self, record: logging.LogRecord) -> str:
                 # Get request ID from context (12 chars for collision resistance)
                 request_id = request_context.get_request_id()
                 request_id_str = f"[{request_id[:12]}] | " if request_id else ""

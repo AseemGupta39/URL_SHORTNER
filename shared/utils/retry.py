@@ -3,17 +3,20 @@ Retry an async callable with exponential backoff.
 """
 import asyncio
 import logging
+from typing import Awaitable, Callable, TypeVar
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
 
 async def retry_with_backoff(
-    operation,
+    operation: Callable[[], Awaitable[_T]],
     *,
-    max_retries=3,
-    backoff_base_seconds=1.0,
-    operation_name="operation",
-):
+    max_retries: int = 3,
+    backoff_base_seconds: float = 1.0,
+    operation_name: str = "operation",
+) -> _T:
     """
     Retry an async callable with exponential backoff.
 
