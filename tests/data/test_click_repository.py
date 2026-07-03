@@ -6,10 +6,12 @@ Integration tests against real PostgreSQL live in tests/integration/.
 import uuid
 import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from shared.core.schemas import ClickData
 from shared.data.interfaces.click_repository import ClickRepository
+from shared.data.repositories.postgres_click_repository import PostgresClickRepository
+from shared.data.models import ClickModel
 
 
 @pytest.fixture
@@ -238,3 +240,125 @@ class TestClickRepositoryGetClickCount:
         result = await repo.get_click_count_for_short_code("nope")
 
         assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# PostgresClickRepository.get_clicks_by_short_code() — implementation tests
+# These test the actual repository code, not the mock interface.
+# They catch regressions like missing fields in the ClickData constructor.
+# ---------------------------------------------------------------------------
+
+class TestPostgresClickRepositoryGetClicks:
+
+    def _make_click_model(self, click_id=None, short_code="abc1234", referrer=None):
+        """Build a fake ClickModel row as SQLAlchemy would return it."""
+        m = MagicMock(spec=ClickModel)
+        m.id = click_id or str(uuid.uuid4())
+        m.short_code = short_code
+        m.original_url = "https://example.com/test"
+        m.clicked_at = datetime(2026, 1, 1, 12, 0, 0)
+        m.ip_address = "127.0.0.1"
+        m.user_agent = "Mozilla/5.0"
+        m.referrer = referrer
+        return m
+
+    @pytest.mark.asyncio
+    async def test_get_clicks_maps_click_id_from_db_row(self):
+        """
+        Regression test for BUG-H1: click_id was missing from ClickData constructor.
+        get_clicks_by_short_code() must populate click_id from click.id on each row.
+        """
+        expected_id = str(uuid.uuid4())
+        fake_row = self._make_click_model(click_id=expected_id)
+
+        repo = PostgresClickRepository(db_url="postgresql+asyncpg://fake/db")
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [fake_row]
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session_factory = MagicMock(return_value=mock_session)
+        repo.async_session = mock_session_factory
+        repo.engine = MagicMock()  # skip initialize()
+
+        result = await repo.get_clicks_by_short_code("abc1234")
+
+        assert len(result) == 1
+        assert result[0].click_id == expected_id
+
+    @pytest.mark.asyncio
+    async def test_get_clicks_returns_correct_fields(self):
+        """All ClickData fields are populated correctly from the DB row."""
+        fake_id = str(uuid.uuid4())
+        fake_row = self._make_click_model(click_id=fake_id, referrer="https://google.com")
+
+        repo = PostgresClickRepository(db_url="postgresql+asyncpg://fake/db")
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [fake_row]
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+
+        repo.async_session = MagicMock(return_value=mock_session)
+        repo.engine = MagicMock()
+
+        result = await repo.get_clicks_by_short_code("abc1234")
+
+        cd = result[0]
+        assert cd.click_id == fake_id
+        assert cd.short_code == "abc1234"
+        assert cd.original_url == "https://example.com/test"
+        assert cd.ip_address == "127.0.0.1"
+        assert cd.user_agent == "Mozilla/5.0"
+        assert cd.referrer == "https://google.com"
+
+    @pytest.mark.asyncio
+    async def test_get_clicks_empty_db_returns_empty_list(self):
+        """Returns empty list when no rows found — no crash, no exception."""
+        repo = PostgresClickRepository(db_url="postgresql+asyncpg://fake/db")
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+
+        repo.async_session = MagicMock(return_value=mock_session)
+        repo.engine = MagicMock()
+
+        result = await repo.get_clicks_by_short_code("nope")
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_get_clicks_multiple_rows_all_have_click_id(self):
+        """Every row in a multi-row result gets its own click_id correctly."""
+        ids = [str(uuid.uuid4()) for _ in range(3)]
+        fake_rows = [self._make_click_model(click_id=i) for i in ids]
+
+        repo = PostgresClickRepository(db_url="postgresql+asyncpg://fake/db")
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = fake_rows
+
+        mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+
+        repo.async_session = MagicMock(return_value=mock_session)
+        repo.engine = MagicMock()
+
+        result = await repo.get_clicks_by_short_code("abc1234")
+
+        assert len(result) == 3
+        assert [cd.click_id for cd in result] == ids

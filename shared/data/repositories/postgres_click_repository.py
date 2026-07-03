@@ -151,6 +151,7 @@ class PostgresClickRepository(ClickRepository):
 
             click_data_list = [
                 ClickData(
+                    click_id=str(click.id),
                     short_code=click.short_code,
                     original_url=click.original_url,
                     clicked_at=click.clicked_at,
