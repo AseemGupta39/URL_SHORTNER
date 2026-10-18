@@ -156,6 +156,8 @@ async def process_batch_from_queue(
                 extra={"failed_count": failed_parse_count},
             )
             outcome = "all_parse_failed"
+            # Bad items are already in DLQ — trim them, else next run re-peeks the same batch forever
+            await queue.remove_first(len(items))
             return {
                 "batch_id": batch_id,
                 "processed": 0,

@@ -147,6 +147,8 @@ async def test_batch_canonical_log_on_all_parse_failed(caplog, url_repo, queue, 
     assert dlq.enqueue.call_count == 2
     # DB never touched
     url_repo.batch_create.assert_not_called()
+    # Bad items must be trimmed from main queue, else they loop forever
+    queue.remove_first.assert_awaited_once_with(2)
 
 
 @pytest.mark.asyncio
@@ -266,6 +268,8 @@ async def test_click_canonical_log_on_all_parse_failed(
     assert rec.worker == "click_batch"
     assert dlq.enqueue.call_count == 2
     click_repo.batch_create.assert_not_called()
+    # Bad items must be trimmed from main queue, else they loop forever
+    queue.remove_first.assert_awaited_once_with(2)
 
 
 @pytest.mark.asyncio

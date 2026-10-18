@@ -174,6 +174,8 @@ async def process_click_batch_from_queue(
         if len(click_data_list) == 0:
             logger.warning("All click items failed to parse", extra={"total_items": len(items), "failed_parse": failed_parse_count})
             outcome = "all_parse_failed"
+            # Bad items are already in DLQ — trim them, else next run re-peeks the same batch forever
+            await queue.remove_first(len(items))
             remaining_size = await queue.size()
             return ClickBatchResult(
                 batch_id=batch_id,
