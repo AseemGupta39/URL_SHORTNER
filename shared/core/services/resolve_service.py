@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class ResolveService:
     """
     Resolves short codes to original URLs.
-    Flow: Redis cache → DB fallback → warm cache → return.
+    Flow: cache (L1 + L2) → DB fallback → warm cache → return.
     """
 
     def __init__(
@@ -48,20 +48,20 @@ class ResolveService:
         try:
             # cache GET — Redis error is not a miss; track separately and fall through to DB
             try:
-                cached_data = await self.cache.get_async(short_code)
+                cached_url = await self.cache.get_async(short_code)
             except Exception as cache_err:
                 logger.warning("Cache GET error, falling through to DB", extra={"short_code": short_code, "error": str(cache_err)})
                 track_cache_operation(CacheOperation.GET, CacheResult.FAILURE, self.service_name)
                 set_canonical_field("cache", "error")
-                cached_data = None
+                cached_url = None
 
-            if cached_data is not None:
-                logger.debug("Cache HIT", extra={"short_code": short_code, "original_url": cached_data.original_url})
+            if cached_url is not None:
+                logger.debug("Cache HIT", extra={"short_code": short_code, "original_url": cached_url})
                 track_cache_operation(CacheOperation.GET, CacheResult.HIT, self.service_name)
                 track_url_redirected(self.service_name)
                 set_canonical_field("cache", "hit")
                 return RedirectResponse(
-                    original_url=HttpUrl(cached_data.original_url),
+                    original_url=HttpUrl(cached_url),
                     status="found",
                 )
 
@@ -81,9 +81,9 @@ class ResolveService:
             logger.info("DB lookup successful", extra={"short_code": short_code, "original_url": url_data.original_url, "db_time_ms": round(db_duration, 2)})
             set_canonical_field("db", "hit")
 
-            # cache warm — fail-open, never blocks the redirect
+            # cache warm — fail-open, never blocks the redirect; cache holds only the URL string
             try:
-                await self.cache.set_async(short_code, url_data)
+                await self.cache.set_async(short_code, url_data.original_url)
                 logger.debug("Cache WARM successful", extra={"short_code": short_code})
                 track_cache_operation(CacheOperation.SET, CacheResult.SUCCESS, self.service_name)
             except Exception as cache_err:

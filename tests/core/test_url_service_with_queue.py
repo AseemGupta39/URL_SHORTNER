@@ -85,10 +85,9 @@ async def test_shorten_url_with_queue(mock_req_id, shorten_service, mock_cache, 
 
     mock_cache.set_async.assert_called_once()
 
-    cached_data = mock_cache.set_async.call_args[0][1]
-    assert isinstance(cached_data, URLData)
-    assert cached_data.short_code == "abc123"
-    assert cached_data.original_url == str(original_url)
+    cache_key, cached_url = mock_cache.set_async.call_args[0]
+    assert cache_key == "abc123"
+    assert cached_url == str(original_url)  # cache holds only the URL string, not URLData
 
     mock_queue.enqueue.assert_called_once()
 
@@ -144,12 +143,7 @@ async def test_multiple_shortens_unique_codes(mock_req_id, shorten_service, mock
 @pytest.mark.asyncio
 async def test_resolve_url_cache_hit(resolve_service, mock_cache, mock_repository):
     """Test URL resolution with cache hit."""
-    cached_data = URLData(
-        short_code="abc123",
-        original_url="https://example.com",
-        created_at=datetime.now()
-    )
-    mock_cache.get_async = AsyncMock(return_value=cached_data)
+    mock_cache.get_async = AsyncMock(return_value="https://example.com")
 
     result = await resolve_service.resolve("abc123")
 

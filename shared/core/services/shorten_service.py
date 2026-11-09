@@ -91,7 +91,7 @@ class ShortenService:
                 created_at=url_data.created_at
             )
 
-            cache_task = asyncio.create_task(self.cache.set_async(short_code, url_data))
+            cache_task = asyncio.create_task(self.cache.set_async(short_code, url_data.original_url))
             queue_task = asyncio.create_task(self.queue.enqueue(queue_msg.to_dict()))
 
             results = await asyncio.gather(cache_task, queue_task, return_exceptions=True)

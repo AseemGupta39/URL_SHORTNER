@@ -1,14 +1,11 @@
 """
 Redis-based distributed cache implementation.
 """
-import json
-from datetime import datetime
 import redis.asyncio as aioredis
 from typing import Optional, Dict, Any
 import logging
 
 from shared.utils.interfaces.cache import Cache
-from shared.core.schemas import URLData
 from shared.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
@@ -17,6 +14,11 @@ logger = logging.getLogger(__name__)
 class RedisCache(Cache):
     """
     Redis-based cache implementing the Cache interface.
+
+    Expected input:  short code → original URL string, via set_async("0000a1B2", "https://...")
+    Expected output: the same string back from get_async("0000a1B2"); None on a miss
+    Stored as a plain key/value pair: url:0000a1B2 -> "https://..." (no JSON, no extra fields),
+    because the redirect only ever needs the original URL.
 
     Connection Pooling:
     - Uses built-in redis-py connection pooling (like PgBouncer for PostgreSQL)
@@ -78,15 +80,13 @@ class RedisCache(Cache):
     def _make_key(self, key: str) -> str:
         return f"{self.key_prefix}{key}"
 
-    async def get_async(self, key: str) -> Optional[Any]:
+    async def get_async(self, key: str) -> Optional[str]:
         """
-        Get value from cache.
+        Get the original URL cached for a short code.
 
-        Args:
-            key: The short code (e.g., "abc123")
-
-        Returns:
-            Cached value if found, None on cache miss. Raises on Redis error.
+        Expected input:  key = short code, e.g. "0000a1B2"
+        Expected output: "https://example.com/p/0000a1B2" on a hit, None on a miss.
+                         Raises on Redis error (callers fall through to the DB).
         """
         if not self._client:
             raise RuntimeError("RedisCache not connected")
@@ -104,47 +104,31 @@ class RedisCache(Cache):
             self._hits += 1
             logger.debug("Cache hit", extra={"short_code": key, "redis_time_ms": round(timer.total(), 2)})
 
-            data_dict = json.loads(value)
-
-            # Reconstruct URLData if it's a dictionary
-            if isinstance(data_dict, dict) and 'short_code' in data_dict:
-                return URLData(
-                    short_code=data_dict['short_code'],
-                    original_url=data_dict['original_url'],
-                    created_at=datetime.fromisoformat(data_dict['created_at'])
-                )
-
-            return data_dict
+            # decode_responses=True in connect(), so this is already the URL string
+            return value
 
         except Exception as e:
             logger.error("Redis GET error", extra={"short_code": key, "error": str(e), "redis_time_ms": round(timer.total(), 2)})
             raise
 
-    async def set_async(self, key: str, value: Any) -> None:
+    async def set_async(self, key: str, value: str) -> None:
         """
-        Store value in cache. Raises on failure.
+        Store the original URL for a short code, with the cache TTL. Raises on failure.
 
-        Args:
-            key: The short code (e.g., "abc123")
-            value: The data to cache (e.g., original URL)
+        Expected input:  key = short code "0000a1B2", value = "https://example.com/p/0000a1B2"
+        Expected output: None; Redis holds url:0000a1B2 -> "https://..." for ttl_seconds.
+                         Raises TypeError if value is not a string (e.g. a whole URLData).
         """
         if not self._client:
             raise RuntimeError("RedisCache not connected")
+        if not isinstance(value, str):
+            raise TypeError(f"RedisCache stores the original URL string, got {type(value).__name__}")
 
         timer = Timer()
         try:
             full_key = self._make_key(key)
 
-            if hasattr(value, 'model_dump'):
-                value_dict = value.model_dump()
-            elif hasattr(value, 'dict'):
-                value_dict = value.dict()
-            else:
-                value_dict = value
-
-            value_json = json.dumps(value_dict, default=str)
-
-            await self._client.set(full_key, value_json, ex=self.ttl_seconds)
+            await self._client.set(full_key, value, ex=self.ttl_seconds)
             logger.debug("Cache SET", extra={"short_code": key, "ttl_seconds": self.ttl_seconds, "redis_time_ms": round(timer.total(), 2)})
 
         except Exception as e:

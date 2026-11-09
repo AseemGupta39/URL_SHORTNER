@@ -45,7 +45,7 @@ def service(mock_repository, mock_cache):
 
 @pytest.mark.asyncio
 async def test_cache_hit_returns_redirect_response(service, mock_cache, mock_repository, url_data):
-    mock_cache.get_async = AsyncMock(return_value=url_data)
+    mock_cache.get_async = AsyncMock(return_value=url_data.original_url)
 
     result = await service.resolve("abc12345")
 
@@ -56,7 +56,7 @@ async def test_cache_hit_returns_redirect_response(service, mock_cache, mock_rep
 
 @pytest.mark.asyncio
 async def test_cache_hit_returns_correct_url(service, mock_cache, url_data):
-    mock_cache.get_async = AsyncMock(return_value=url_data)
+    mock_cache.get_async = AsyncMock(return_value=url_data.original_url)
 
     result = await service.resolve("abc12345")
 
@@ -65,7 +65,7 @@ async def test_cache_hit_returns_correct_url(service, mock_cache, url_data):
 
 @pytest.mark.asyncio
 async def test_cache_hit_does_not_warm_cache(service, mock_cache, url_data):
-    mock_cache.get_async = AsyncMock(return_value=url_data)
+    mock_cache.get_async = AsyncMock(return_value=url_data.original_url)
 
     await service.resolve("abc12345")
 
@@ -93,7 +93,7 @@ async def test_cache_miss_db_hit_warms_cache(service, mock_cache, mock_repositor
 
     await service.resolve("abc12345")
 
-    mock_cache.set_async.assert_called_once_with("abc12345", url_data)
+    mock_cache.set_async.assert_called_once_with("abc12345", url_data.original_url)
 
 
 @pytest.mark.asyncio
@@ -156,7 +156,7 @@ async def test_cache_warm_exception_does_not_break_resolve(service, mock_cache, 
 
 @pytest.mark.asyncio
 async def test_resolve_passes_correct_short_code_to_cache(service, mock_cache, url_data):
-    mock_cache.get_async = AsyncMock(return_value=url_data)
+    mock_cache.get_async = AsyncMock(return_value=url_data.original_url)
 
     await service.resolve("mycode1")
 
